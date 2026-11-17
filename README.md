@@ -3,6 +3,20 @@
 Sleepyhead is an Android app that helps you get out of bed and to your desk in the morning,
 instead of reading news, social media and work chat in bed.
 
+## Screenshots
+
+| During the lock | Routine done | Outside the lock |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/home-lock.png" width="240" alt="Home during the lock: step 2 of 3, a timer and the scan button"> | <img src="docs/screenshots/done.png" width="240" alt="Done screen: a full sunrise and a 10-morning streak"> | <img src="docs/screenshots/rest.png" width="240" alt="Home outside the lock: the streak and the last 7 days"> |
+| The next step, the time since lock start and the time to lock end. | The sun is up. The screen shows your streak and your last 7 days. | The screen shows your result for today and your next lock start. |
+
+| History: 16 weeks | History: Year | History: Month |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/history.png" width="240" alt="History: streak ring, stats, 16-week grid and a day card"> | <img src="docs/screenshots/year.png" width="240" alt="Year in pixels: one square for each morning of the year"> | <img src="docs/screenshots/month.png" width="240" alt="Month view: a calendar with one square for each morning"> |
+| Your streak, your stats and one square for each morning. Tap a square to see that day. | One square for each morning of the year. | One square for each morning of the month. |
+
+The screenshots use test data on an Android emulator.
+
 ## What it does
 
 - **Onboarding.** The first launch walks you through the lock times, the apps to block,
