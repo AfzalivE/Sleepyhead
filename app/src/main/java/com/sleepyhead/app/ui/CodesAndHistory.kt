@@ -100,12 +100,14 @@ fun HistoryScreen(data: AppData, onBack: () -> Unit, modifier: Modifier) {
             val log = data.logs[day.toString()]
             val routineDay = Routine.isRoutineDay(data.settings, day)
             if (!routineDay && log == null) return@forEach
+            if (log == null && data.settings.startedOn?.let { day.isBefore(LocalDate.parse(it)) } == true) return@forEach
             val status = when {
                 log?.completedAtMillis != null -> {
                     val t = Instant.ofEpochMilli(log.completedAtMillis).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
-                    if (log.onTime) "✓ At desk $t" else "◐ At desk $t (late)"
+                    if (log.onTime) "✓ Done $t" else "◐ Done $t (after lock end)"
                 }
                 log?.skipped == true -> "– Skipped"
+                log?.away == true && data.settings.autoTravel -> "✈ Away from home"
                 day == today -> "… In progress"
                 else -> "✗ Not finished"
             }
