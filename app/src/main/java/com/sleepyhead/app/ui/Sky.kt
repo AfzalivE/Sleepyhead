@@ -142,15 +142,3 @@ fun cellLabel(c: Insights.Cell): String = when (c) {
     Insights.Cell.Off -> "Day off"
     Insights.Cell.Pending -> "Not yet"
 }
-
-/** The app icon's sun over the horizon, for the wordmark and onboarding. */
-@Composable
-fun SunMark(modifier: Modifier = Modifier) {
-    androidx.compose.foundation.Image(
-        androidx.compose.ui.res.painterResource(com.sleepyhead.app.R.drawable.ic_launcher_foreground),
-        contentDescription = null,
-        // The drawable has a wide safe area. Scale it up so the mark fills the box.
-        modifier = modifier.graphicsLayer { scaleX = 1.7f; scaleY = 1.7f },
-    )
-}
-
