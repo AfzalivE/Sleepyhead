@@ -94,7 +94,9 @@ class LockService : AccessibilityService() {
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString() != pkg) return
         if (guard.shouldBlock(pkg, root)) {
-            performGlobalAction(GLOBAL_ACTION_HOME)
+            // Back (not Home): after Home, Android delays activity starts for a few seconds,
+            // so Sleepyhead would not open. Back closes the page or dialog, then Sleepyhead opens on top.
+            performGlobalAction(GLOBAL_ACTION_BACK)
             sendBack(MainActivity.BLOCKED_SETTINGS)
         }
     }
