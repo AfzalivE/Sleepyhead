@@ -7,6 +7,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -76,7 +81,13 @@ fun App(store: Store, blockedFrom: String?, onBlockedSeen: () -> Unit) {
     if (screen != Screen.Home) {
         BackHandler { screen = if (screen in listOf(Screen.Apps, Screen.Steps)) Screen.Settings else Screen.Home }
     }
-    val m = Modifier.fillMaxSize().safeDrawingPadding()
+    // On wide screens (tablets, unfolded foldables), keep content in a centered column.
+    val m = Modifier
+        .fillMaxSize()
+        .safeDrawingPadding()
+        .wrapContentWidth(Alignment.CenterHorizontally)
+        .widthIn(max = 600.dp)
+        .fillMaxWidth()
     when (screen) {
         Screen.Home -> HomeScreen(store, data, blockedFrom, onBlockedSeen, go, m)
         Screen.Settings -> SettingsScreen(store, data, go, m)
