@@ -21,6 +21,8 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- Read Settings' own strings (for example "Force stop") in the phone's language. -->
+        <package android:name="com.android.settings" />
     </queries>
 
     <application

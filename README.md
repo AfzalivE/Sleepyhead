@@ -20,6 +20,14 @@ instead of reading news, social media and work chat in bed.
 - **Travel mode.** Save your home location once. At lock start, if your phone is away from home,
   the lock stays off for that day. Travel days do not break your streak. There is no manual
   "lock off" switch, so travel mode is not an easy way out.
+- **Honest streaks.** A morning counts only when the lock was on for the whole lock window.
+  If the lock service stops during the lock (for example after *Force stop*), that morning shows
+  "Lock was off" and does not count. Time while the phone is switched off does not count as a gap.
+  During the lock, a red card on the calm screen tells you when the lock is off and turns it back on.
+- **Settings guard.** During the lock only, Sleepyhead sends you back when you open its own
+  *App info* page (Force stop, Uninstall), its *Storage* page (Clear storage), its Accessibility page,
+  or its uninstall dialog. It finds these pages by their text plus the app name, so the app list
+  and other apps' pages stay open. Outside the lock, nothing in Settings is blocked.
 - **Emergency skip.** Hold the text at the bottom of the calm screen for 10 seconds to unlock for the day.
   A skipped day breaks the streak.
 
@@ -49,7 +57,8 @@ Requirements: JDK 17 or newer and the Android SDK (platform 35). Android Studio 
    - On Android 13 and newer, a sideloaded app can show **"Restricted setting"**.
      Open *App info* for Sleepyhead (there is a button in Settings), tap the **⋮** menu,
      choose **Allow restricted settings**, then turn on the service again.
-   - The service only checks which app is in front. It does not read the screen.
+   - The service checks which app is in front. During the lock only, it also reads text in Settings and
+     the package installer, to protect Sleepyhead's own pages. It does not read other apps.
 4. **Camera:** tap *Allow*. The camera is used only to scan your codes.
 5. **Blocked apps:** check the list. Sleepyhead selects common news, social and chat apps
    that are installed (for example X, Instagram, Reddit, Slack, Teams, Gmail, YouTube).
@@ -89,7 +98,8 @@ Scan the codes in order. *Settings → Clear today's progress* resets today.
 ## Limits
 
 - You can change the routine and blocked apps only when the lock is off.
-  You can still turn off the Accessibility service in system settings. Sleepyhead does not try to stop that.
+  During the lock, Sleepyhead's own settings pages are blocked. A restart of the phone into safe mode, or
+  `adb`, can still stop the lock. Then that morning shows "Lock was off" and does not count.
 - The morning window must be within one day (lock start before lock end).
 - Data stays on the phone (SharedPreferences). There is no account and no network use.
 - If Sleepyhead cannot get your location at lock start, the lock stays on.
@@ -100,7 +110,9 @@ Scan the codes in order. *Settings → Clear today's progress* resets today.
 | --- | --- |
 | `data/Routine.kt` | Pure rules: lock window, step order, on-time, streaks (unit tested) |
 | `data/Store.kt` | Saves settings, steps and the daily log as JSON |
-| `lock/LockService.kt` | Accessibility service that sends you back from blocked apps |
+| `lock/LockService.kt` | Accessibility service that sends you back from blocked apps and guarded pages |
+| `lock/SettingsGuard.kt` | Finds Sleepyhead's App info, Storage, Accessibility and uninstall pages |
+| `lock/LockHealth.kt` | Finds gaps when the lock service was off, for honest streaks |
 | `nfc/Nfc.kt` | NFC reader mode, tag pairing and writing, and tags that open the app |
 | `travel/TravelCheck.kt` | Home/away check at lock start, and the lock-start alarm |
 | `qr/QrCodes.kt` | QR generation and the print/PDF document |

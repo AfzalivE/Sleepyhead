@@ -85,7 +85,7 @@ fun HistoryScreen(data: AppData, onBack: () -> Unit, modifier: Modifier) {
     val dateFmt = DateTimeFormatter.ofPattern("EEE, MMM d")
     val timeFmt = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
     val last30 = (0 until 30).map { today.minusDays(it.toLong()) }
-    val onTime30 = last30.count { data.logs[it.toString()]?.onTime == true }
+    val onTime30 = last30.count { data.logs[it.toString()]?.let { l -> l.onTime && !l.lockOff } == true }
     val routineDays30 = last30.count { Routine.isRoutineDay(data.settings, it) }
 
     Column(modifier.padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
@@ -102,6 +102,7 @@ fun HistoryScreen(data: AppData, onBack: () -> Unit, modifier: Modifier) {
             if (!routineDay && log == null) return@forEach
             if (log == null && data.settings.startedOn?.let { day.isBefore(LocalDate.parse(it)) } == true) return@forEach
             val status = when {
+                log?.lockOff == true && !log.skipped && !(log.away == true && data.settings.autoTravel) -> "! Lock was off"
                 log?.completedAtMillis != null -> {
                     val t = Instant.ofEpochMilli(log.completedAtMillis).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
                     if (log.onTime) "✓ Done $t" else "◐ Done $t (after lock end)"

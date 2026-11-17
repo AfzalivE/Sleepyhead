@@ -1,5 +1,5 @@
 <resources>
     <string name="app_name">Sleepyhead</string>
     <string name="lock_service_label">Sleepyhead morning lock</string>
-    <string name="lock_service_description">During your morning window, Sleepyhead sends you back to your routine when you open an app you chose to block. It only checks which app is in front. It does not read what is on your screen.</string>
+    <string name="lock_service_description">During your morning window, Sleepyhead sends you back to your routine when you open an app you chose to block. It also protects its own settings pages (App info, Storage, this Accessibility page and the uninstall dialog) until you finish your morning. To find these pages, it reads text only in Settings and the package installer, and only during the lock. It does not read other apps, and no data leaves your phone.</string>
 </resources>

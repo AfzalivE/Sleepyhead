@@ -149,9 +149,15 @@ fun HomeScreen(
             IconButton(onClick = { go(Screen.Settings) }) { Icon(Icons.Outlined.Settings, "Settings") }
         }
 
-        if (blockedFrom != null && lockActive) {
+        if (blockedFrom == MainActivity.BLOCKED_SETTINGS && lockActive) {
+            Notice("Sleepyhead's settings are locked until you finish your morning.", onDismiss = onBlockedSeen)
+        } else if (blockedFrom != null && lockActive) {
             val label = remember(blockedFrom) { InstalledApps.label(context, blockedFrom) }
             Notice("$label can wait. Finish your morning first.", onDismiss = onBlockedSeen)
+        }
+        val serviceOn = LockService.isEnabled(context)
+        if (inWindowNow(data, now) && !serviceOn && !Routine.isFinished(log) && !Routine.isTravelDay(data, today)) {
+            LockOffCard()
         }
         message?.let { Notice(it, onDismiss = { message = null }) }
 
@@ -162,7 +168,7 @@ fun HomeScreen(
         val inWindow = Routine.inMorningWindow(data.settings, now)
         when {
             !inWindow -> RestView(data, now, streak) { go(Screen.Steps) }
-            finishedAt != null -> DoneView(finishedAt, log.onTime, streak, Routine.bestStreak(data), justFinished)
+            finishedAt != null -> DoneView(finishedAt, log.onTime, log.lockOff, streak, Routine.bestStreak(data), justFinished)
             travel -> {
                 Text("✈", fontSize = 56.sp, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(12.dp))
@@ -190,7 +196,7 @@ fun HomeScreen(
         }
         if (lockActive) {
             HoldToSkip { store.skipToday() }
-        } else if (!LockService.isEnabled(context)) {
+        } else if (!serviceOn && !inWindow) {
             Small("The morning lock is off. Turn it on in Settings.")
         }
     }
@@ -260,12 +266,18 @@ private fun NextStepView(
 }
 
 @Composable
-private fun DoneView(finishedAt: Long, onTime: Boolean, streak: Int, best: Int, animate: Boolean) {
+private fun DoneView(finishedAt: Long, onTime: Boolean, lockOff: Boolean, streak: Int, best: Int, animate: Boolean) {
     val t = Instant.ofEpochMilli(finishedAt).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
     RisingSun(animate = animate)
     Spacer(Modifier.height(8.dp))
-    Big(if (onTime) Encouragement.doneHeadline(streak) else "You're at your desk.")
-    Small(if (onTime) "Done at $t. Your phone is all yours." else "Done at $t, after the lock ended. You still did it.")
+    Big(if (onTime && !lockOff) Encouragement.doneHeadline(streak) else "You're at your desk.")
+    Small(
+        when {
+            lockOff -> "Done at $t. The lock was off for part of this morning, so it does not count for your streak."
+            onTime -> "Done at $t. Your phone is all yours."
+            else -> "Done at $t, after the lock ended. You still did it."
+        }
+    )
     if (streak > 0) {
         Spacer(Modifier.height(24.dp))
         if (animate) CountUp(streak) else Text("$streak", fontSize = 56.sp, fontWeight = FontWeight.Light)
@@ -328,6 +340,7 @@ private fun RestView(data: AppData, now: LocalDateTime, streak: Int, onTestNow: 
                 Routine.DayStatus.Late -> { Big("You did it"); Small("Today you finished at $t, after the lock ended.") }
                 Routine.DayStatus.Skipped -> { Big("Today's morning is over"); Small("You skipped today. Tomorrow is a new morning.") }
                 Routine.DayStatus.Away -> { Big("No lock today"); Small("You were away from home this morning.") }
+                Routine.DayStatus.LockOff -> { Big("Today's morning is over"); Small("The lock was off for part of this morning, so it does not count for your streak.") }
                 else -> { Big("Today's morning is over"); Small("Tomorrow is a new morning.") }
             }
         }
@@ -354,7 +367,7 @@ private fun RestView(data: AppData, now: LocalDateTime, streak: Int, onTestNow: 
     Spacer(Modifier.height(20.dp))
     WeekStrip(data, now)
     Text(
-        "✓ done   ✈ away   – skipped   ✗ missed",
+        "✓ done   ✈ away   – skipped   ! lock off   ✗ missed",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 6.dp),
@@ -368,7 +381,7 @@ private fun RestView(data: AppData, now: LocalDateTime, streak: Int, onTestNow: 
     }
 }
 
-/** The last 7 days: ✓ done, ◐ done late, – skipped, ✈ away, · day off, ✗ missed. */
+/** The last 7 days: ✓ done, ◐ done late, – skipped, ✈ away, ! lock was off, · day off, ✗ missed. */
 @Composable
 private fun WeekStrip(data: AppData, now: LocalDateTime) {
     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -380,6 +393,7 @@ private fun WeekStrip(data: AppData, now: LocalDateTime) {
                 Routine.DayStatus.Late -> "◐" to MaterialTheme.colorScheme.primary
                 Routine.DayStatus.Skipped -> "–" to MaterialTheme.colorScheme.onSurfaceVariant
                 Routine.DayStatus.Away -> "✈" to MaterialTheme.colorScheme.secondary
+                Routine.DayStatus.LockOff -> "!" to MaterialTheme.colorScheme.error
                 Routine.DayStatus.DayOff -> "·" to MaterialTheme.colorScheme.onSurfaceVariant
                 Routine.DayStatus.Pending -> "○" to MaterialTheme.colorScheme.onSurfaceVariant
                 Routine.DayStatus.Missed -> "✗" to MaterialTheme.colorScheme.onSurfaceVariant
@@ -464,4 +478,32 @@ private fun formatDuration(totalSeconds: Int): String {
     val m = (s % 3600) / 60
     val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+private fun inWindowNow(data: AppData, now: LocalDateTime) = data.steps.isNotEmpty() && Routine.inMorningWindow(data.settings, now)
+
+/** During the morning, a lock that is off is a problem. Say so clearly and give a one-tap fix. */
+@Composable
+private fun LockOffCard() {
+    val context = LocalContext.current
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("The morning lock is off", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+            Text(
+                "Your apps are not blocked. While the lock is off, this morning does not count for your streak.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+            )
+            Button(onClick = {
+                context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }) { Text("Turn on the lock") }
+        }
+    }
 }

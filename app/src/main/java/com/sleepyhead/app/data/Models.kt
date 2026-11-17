@@ -57,6 +57,8 @@ data class DayLog(
     val blockedAttempts: Int = 0,
     /** Result of the travel check at lock start: true = away from home, null = not checked. */
     val away: Boolean? = null,
+    /** True when the lock service was off during part of this morning's lock (for example after a force stop). */
+    val lockOff: Boolean = false,
 )
 
 @Serializable

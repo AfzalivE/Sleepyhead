@@ -30,6 +30,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sleepyhead.app.SleepyheadApp
 import com.sleepyhead.app.data.Routine
 import com.sleepyhead.app.data.Store
+import com.sleepyhead.app.lock.LockHealth
+import com.sleepyhead.app.lock.LockService
 import com.sleepyhead.app.nfc.NfcEvent
 import com.sleepyhead.app.nfc.NfcHub
 import com.sleepyhead.app.travel.TravelCheck
@@ -59,6 +61,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         NfcHub.enableReader(this, store)
         TravelCheck.runIfNeeded(this, store)
+        // If the lock service is not running now, the time since it was last seen is a gap.
+        if (!LockService.running || !LockService.isEnabled(this)) LockHealth.recordGap(this, store)
     }
 
     override fun onPause() {
@@ -83,6 +87,8 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_BLOCKED_PACKAGE = "blocked_package"
+        /** Sent as the blocked package when the lock sends you back from Sleepyhead's own settings pages. */
+        const val BLOCKED_SETTINGS = "sleepyhead.settings"
     }
 }
 
