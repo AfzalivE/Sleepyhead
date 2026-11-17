@@ -7,7 +7,7 @@ instead of reading news, social media and work chat in bed.
 
 | During the lock | Routine done | Outside the lock |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/home-lock.png" width="240" alt="Home during the lock: step 2 of 3, a timer and the scan button"> | <img src="docs/screenshots/done.png" width="240" alt="Done screen: a full sunrise and a 10-morning streak"> | <img src="docs/screenshots/rest.png" width="240" alt="Home outside the lock: the streak and the last 7 days"> |
+| <img src="docs/screenshots/home-lock.png" width="240" alt="Home during the lock: step 2 of 3, the clock and the scan button"> | <img src="docs/screenshots/done.png" width="240" alt="Done screen: a full sunrise and a 10-morning streak"> | <img src="docs/screenshots/rest.png" width="240" alt="Home outside the lock: the streak and the last 7 days"> |
 | The next step, the time since lock start and the time to lock end. | The sun is up. The screen shows your streak and your last 7 days. | The screen shows your result for today and your next lock start. |
 
 | History: 16 weeks | History: Year | History: Month |
@@ -26,16 +26,17 @@ The screenshots use test data on an Android emulator.
   your routine, or at lock end.
 - **Proof-based checklist.** Each step of your routine has a printed QR code, an NFC tag, or both, in its place:
   bathroom, kitchen, desk. You finish a step only when you scan its code or tap its tag. You must do the steps in order.
-- **Calm start screen.** During the lock, the screen shows only the next step, a timer since lock start,
-  and the time left until lock end. Outside the lock, it shows when your next morning starts,
+- **Calm start screen.** During the lock, the screen shows only the next step, the time of day,
+  and when the lock ends. Outside the lock, it shows when your next morning starts,
   your streak and the last 7 days.
 - **The sky.** During the lock, the Home background moves from night to dawn with each step, and a sun rises.
   A row of chips shows your steps and the time you did each one. When you finish, the sky is a full sunrise.
 - **Streaks and history.** A morning counts when you finish before lock end. History shows a streak ring
-  that fills toward the next milestone, your on-time rate, your usual desk time and your average time from
-  lock start to desk. A 16-week grid, a Year in pixels view and a Month view show one square per morning:
-  an earlier finish is brighter. Tap a square to see the day (desk time, minutes, blocked-app attempts).
-  A chart shows your time to desk for the last 30 days.
+  that fills toward the next milestone, your on-time rate, your usual desk time and your earliest desk time.
+  The desk time is the time of day you finish your routine. A 16-week grid, a Year in pixels view and a
+  Month view show one square per morning: a finish before 8:00 is brightest, 8:00 to 10:00 is medium,
+  and later is darker. Tap a square to see the day (desk time, blocked-app attempts).
+  A chart shows your desk time for the last 30 days.
 - **Travel mode.** Save your home location once. At lock start, if your phone is away from home,
   the lock stays off for that day. Travel days do not break your streak. There is no manual
   "lock off" switch, so travel mode is not an easy way out.
