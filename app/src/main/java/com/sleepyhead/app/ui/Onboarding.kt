@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -86,6 +87,8 @@ fun OnboardingScreen(store: Store, data: AppData, modifier: Modifier) {
                 }
             }
         }
+        // A line above the buttons shows where the scrolling page ends.
+        HorizontalDivider()
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             if (page > 0) TextButton(onClick = { page-- }) { Text("Back") } else Spacer(Modifier)
             if (page < PAGES - 1) {

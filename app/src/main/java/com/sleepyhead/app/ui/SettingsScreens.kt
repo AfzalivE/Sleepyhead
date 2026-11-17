@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -279,8 +281,12 @@ fun TravelSection(store: Store, data: AppData, enabled: Boolean) {
             if (loc == null) {
                 status = "Could not find your location. Check that location is on, then try again."
             } else {
-                store.updateSettings { it.copy(home = HomeLocation(loc.latitude, loc.longitude)) }
-                status = "Home saved."
+                val first = store.data.value.settings.home == null
+                // Saving home the first time also turns on the away check, since that is why you save it.
+                store.updateSettings {
+                    it.copy(home = HomeLocation(loc.latitude, loc.longitude), autoTravel = it.autoTravel || first)
+                }
+                status = if (first) "Home saved. The lock now stays off on mornings when you are away." else "Home updated."
             }
         }
     }
@@ -335,15 +341,18 @@ fun SetupRow(
 
 @Composable
 private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    // The whole row toggles the switch, so tapping the label works too.
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = enabled) { onChange(!checked) }.padding(vertical = 8.dp),
+        Modifier.fillMaxWidth()
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
