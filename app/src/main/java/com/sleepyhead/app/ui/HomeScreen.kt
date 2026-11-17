@@ -344,9 +344,12 @@ private fun MiniWeek(data: AppData, now: LocalDateTime, animateToday: Boolean, l
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 val m = if (back == 0) Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value } else Modifier
                 // On the bright sunrise, a day off is a soft shadow, not a dark hole.
-                val sq = if (onLight && c == Insights.Cell.Off) {
-                    m.size(22.dp).background(Palette.Ink.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
-                } else m.size(22.dp).cellSquare(c, 6.dp, selected = back == 0 && Insights.isGood(c))
+                val sq = when {
+                    onLight && c == Insights.Cell.Off -> m.size(22.dp).background(Palette.Ink.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                    // On the bright sky, a thin dark edge keeps the light squares visible.
+                    onLight -> m.size(22.dp).cellSquare(c, 6.dp).border(if (back == 0) 2.dp else 1.dp, Palette.Ink.copy(alpha = if (back == 0) 0.7f else 0.25f), RoundedCornerShape(6.dp))
+                    else -> m.size(22.dp).cellSquare(c, 6.dp, selected = back == 0 && Insights.isGood(c))
+                }
                 Box(
                     sq
                         .semantics { contentDescription = date.dayOfWeek.toString() + ": " + cellLabel(c) },

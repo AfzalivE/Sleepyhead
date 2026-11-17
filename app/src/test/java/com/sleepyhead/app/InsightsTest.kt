@@ -65,4 +65,11 @@ class InsightsTest {
         assertEquals(monday, grid.last().first())
         assertEquals(java.time.DayOfWeek.MONDAY, grid.first().first().dayOfWeek)
     }
+
+    @Test fun headlineOnlyOnExactMilestones() {
+        val e = com.sleepyhead.app.ui.Encouragement
+        assertEquals("Ten in a row. You're on fire.", e.doneHeadline(10))
+        assertEquals("11 in a row. Good morning!", e.doneHeadline(11))
+        assertEquals("You're at your desk.", e.doneHeadline(1))
+    }
 }
