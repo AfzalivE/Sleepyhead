@@ -69,7 +69,6 @@ class RoutineTest {
     }
 
     @Test fun travelModeKeepsLockOff() {
-        assertFalse(Routine.isLockActive(base.copy(settings = settings.copy(travelMode = true)), at(7, 0)))
         val auto = base.copy(settings = settings.copy(autoTravel = true, home = HomeLocation(43.65, -79.38)))
         assertTrue(Routine.needsTravelCheck(auto, at(7, 0)))
         assertFalse(Routine.needsTravelCheck(auto, at(6, 0)))

@@ -31,9 +31,7 @@ data class Settings(
     val defaultsApplied: Boolean = false,
     /** False until onboarding is finished. */
     val onboarded: Boolean = false,
-    /** Manual travel mode: the lock stays off until you turn this off. */
-    val travelMode: Boolean = false,
-    /** Automatic travel mode: at lock start, if the phone is away from [home], the lock stays off that day. */
+    /** Travel mode: at lock start, if the phone is away from [home], the lock stays off that day. */
     val autoTravel: Boolean = false,
     val home: HomeLocation? = null,
     val homeRadiusMeters: Int = 2000,

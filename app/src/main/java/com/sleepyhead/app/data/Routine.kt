@@ -27,27 +27,25 @@ object Routine {
     fun isFinished(log: DayLog?): Boolean =
         log != null && (log.completedAtMillis != null || log.skipped)
 
-    /** Why the lock is off today because of travel, or null when travel does not apply. */
-    enum class TravelState { Manual, Away }
-
-    fun travelState(data: AppData, date: LocalDate): TravelState? = when {
-        data.settings.travelMode -> TravelState.Manual
-        data.settings.autoTravel && data.logs[date.toString()]?.away == true -> TravelState.Away
-        else -> null
-    }
+    /**
+     * True when travel mode is on and the phone was away from home at lock start.
+     * There is no manual switch on purpose: it would be an easy way out of the lock.
+     */
+    fun isTravelDay(data: AppData, date: LocalDate): Boolean =
+        data.settings.autoTravel && data.logs[date.toString()]?.away == true
 
     /** True when distracting apps must be blocked now. */
     fun isLockActive(data: AppData, now: LocalDateTime): Boolean {
         if (data.steps.isEmpty()) return false
         if (!inMorningWindow(data.settings, now)) return false
-        if (travelState(data, now.toLocalDate()) != null) return false
+        if (isTravelDay(data, now.toLocalDate())) return false
         return !isFinished(data.logs[now.toLocalDate().toString()])
     }
 
     /** True when today's home/away check still has to run. */
     fun needsTravelCheck(data: AppData, now: LocalDateTime): Boolean {
         val s = data.settings
-        if (!s.autoTravel || s.home == null || s.travelMode) return false
+        if (!s.autoTravel || s.home == null) return false
         if (!inMorningWindow(s, now)) return false
         val log = data.logs[now.toLocalDate().toString()]
         return !isFinished(log) && log?.away == null

@@ -125,18 +125,15 @@ fun HomeScreen(
 
         Spacer(Modifier.weight(1f))
 
-        val travel = Routine.travelState(data, today)
+        val travel = Routine.isTravelDay(data, today)
         val finishedAt = log?.completedAtMillis
         when {
             finishedAt != null -> DoneView(finishedAt, log.onTime, streak)
-            travel != null -> {
+            travel -> {
                 Text("✈", fontSize = 56.sp, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(12.dp))
                 Big("No lock today")
-                Small(
-                    if (travel == Routine.TravelState.Manual) "Travel mode is on. Turn it off in Settings when you are home."
-                    else "You were away from home at lock start. Your streak is safe."
-                )
+                Small("You were away from home at lock start. Your streak is safe.")
                 if (next != null) {
                     Spacer(Modifier.height(16.dp))
                     TextButton(onClick = { scan() }) { Text("Do the routine anyway") }

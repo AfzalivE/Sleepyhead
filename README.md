@@ -16,9 +16,9 @@ instead of reading news, social media and work chat in bed.
   and the time left until lock end.
 - **Streaks and log.** A morning counts when you finish before lock end. You see your current streak,
   your best streak, and a 30-day log. The log also counts how often you reached for a blocked app.
-- **Travel mode.** Turn it on by hand, and the lock stays off until you turn it off. Or save your home
-  location: at lock start, if your phone is away from home, the lock stays off for that day.
-  Travel days do not break your streak.
+- **Travel mode.** Save your home location once. At lock start, if your phone is away from home,
+  the lock stays off for that day. Travel days do not break your streak. There is no manual
+  "lock off" switch, so travel mode is not an easy way out.
 - **Emergency skip.** Hold the text at the bottom of the calm screen for 10 seconds to unlock for the day.
   A skipped day breaks the streak.
 
@@ -54,7 +54,7 @@ Requirements: JDK 17 or newer and the Android SDK (platform 35). Android Studio 
    that are installed (for example X, Instagram, Reddit, Slack, Teams, Gmail, YouTube).
 6. Set your lock start, lock end and days.
 7. Optional: in Settings → Travel, allow location ("Allow all the time"), tap *Set to here* while you are at home,
-   and turn on *Turn off the lock when I'm away*. Anywhere within 2 km of home counts as home.
+   and check that *Travel mode* is on (saving home the first time turns it on). Anywhere within 2 km of home counts as home.
 
 The first launch shows these steps as onboarding. Settings → *Show the welcome steps again* shows them again.
 
