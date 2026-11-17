@@ -48,6 +48,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -82,6 +84,8 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+
+private val TopInk = Color(0xFFB4BCCB)
 
 private val timeFmt: DateTimeFormatter = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 
@@ -143,17 +147,19 @@ fun HomeScreen(
 
     Box(modifier) {
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        // Top bar. Small and quiet on purpose.
+        // Top bar. Small and quiet on purpose. Always light: it sits on the dark top of the sky.
+        CompositionLocalProvider(LocalContentColor provides TopInk) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 if (streak > 0) "$streak-morning streak" else "Sleepyhead",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = TopInk,
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = { go(Screen.History) }) { Icon(Icons.Outlined.CalendarMonth, "History") }
             IconButton(onClick = { go(Screen.Codes) }) { Icon(Icons.Outlined.QrCode2, "QR codes") }
             IconButton(onClick = { go(Screen.Settings) }) { Icon(Icons.Outlined.Settings, "Settings") }
+        }
         }
 
         if (blockedFrom == MainActivity.BLOCKED_SETTINGS && lockActive) {
@@ -317,14 +323,14 @@ private fun DoneView(
         }
     }
     Spacer(Modifier.height(18.dp))
-    MiniWeek(data, now, animateToday = animate)
+    MiniWeek(data, now, animateToday = animate, letters = true, onLight = true)
     Spacer(Modifier.height(16.dp))
     Text("Your phone is all yours ☀", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onBackground)
 }
 
 /** The last 7 days as squares. On the done screen, today's square pops in. */
 @Composable
-private fun MiniWeek(data: AppData, now: LocalDateTime, animateToday: Boolean, letters: Boolean = false) {
+private fun MiniWeek(data: AppData, now: LocalDateTime, animateToday: Boolean, letters: Boolean = false, onLight: Boolean = false) {
     val zone = ZoneId.systemDefault()
     val pop = remember { Animatable(if (animateToday) 0f else 1f) }
     LaunchedEffect(Unit) {
@@ -337,8 +343,12 @@ private fun MiniWeek(data: AppData, now: LocalDateTime, animateToday: Boolean, l
             val c = Insights.cell(data, date, now, zone)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 val m = if (back == 0) Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value } else Modifier
+                // On the bright sunrise, a day off is a soft shadow, not a dark hole.
+                val sq = if (onLight && c == Insights.Cell.Off) {
+                    m.size(22.dp).background(Palette.Ink.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                } else m.size(22.dp).cellSquare(c, 6.dp, selected = back == 0 && Insights.isGood(c))
                 Box(
-                    m.size(22.dp).cellSquare(c, 6.dp, selected = back == 0 && Insights.isGood(c))
+                    sq
                         .semantics { contentDescription = date.dayOfWeek.toString() + ": " + cellLabel(c) },
                 )
                 if (letters) {

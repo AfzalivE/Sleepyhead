@@ -117,7 +117,8 @@ fun cellColor(c: Insights.Cell): Color = when (c) {
     Insights.Cell.Away -> Palette.Away
     Insights.Cell.LockOff -> Palette.LockOff
     Insights.Cell.Skipped -> Palette.Skipped
-    Insights.Cell.Missed, Insights.Cell.Pending -> Color.Transparent
+    Insights.Cell.Missed -> Color.Transparent
+    Insights.Cell.Pending -> Color(0xFF181C26)
     Insights.Cell.Off -> Palette.Empty
 }
 
@@ -125,8 +126,8 @@ fun cellColor(c: Insights.Cell): Color = when (c) {
 fun Modifier.cellSquare(c: Insights.Cell, corner: Dp = 4.dp, selected: Boolean = false): Modifier {
     val shape = RoundedCornerShape(corner)
     val base = when (c) {
-        Insights.Cell.Missed -> border(1.dp, Color(0xFF4A5266), shape)
-        Insights.Cell.Pending -> border(1.dp, Color(0xFF2C3344), shape)
+        // Missed is a clear outline. Not-yet days are a faint fill, so the two look different.
+        Insights.Cell.Missed -> border(1.5.dp, Color(0xFF6A7388), shape)
         else -> background(cellColor(c), shape)
     }
     return if (selected) base.border(2.dp, Color.White, shape) else base

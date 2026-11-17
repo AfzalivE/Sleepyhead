@@ -362,7 +362,6 @@ private fun MonthGrid(data: AppData, month: YearMonth, now: LocalDateTime, zone:
                     Spacer(mod)
                 } else {
                     val c = if (d.isAfter(today)) Insights.Cell.Pending else Insights.cell(data, d, now, zone)
-                    val good = Insights.isGood(c)
                     Box(
                         mod.cellSquare(c, 8.dp, d == selected)
                             .clickable(enabled = !d.isAfter(today)) { onTap(d) }
@@ -372,7 +371,13 @@ private fun MonthGrid(data: AppData, month: YearMonth, now: LocalDateTime, zone:
                         Text(
                             "${d.dayOfMonth}",
                             style = MaterialTheme.typography.labelMedium,
-                            color = if (good) Palette.Ink else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = when {
+                                Insights.isGood(c) -> Palette.Ink
+                                c == Insights.Cell.Away || c == Insights.Cell.LockOff || c == Insights.Cell.AfterEnd || c == Insights.Cell.Skipped -> Color.White
+                                c == Insights.Cell.Pending -> Color(0xFF5A6275)
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            fontWeight = if (Insights.isGood(c)) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     }
                 }
