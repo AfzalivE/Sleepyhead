@@ -9,6 +9,7 @@ import android.provider.Settings
 import android.text.TextUtils
 import android.view.accessibility.AccessibilityEvent
 import com.sleepyhead.app.SleepyheadApp
+import com.sleepyhead.app.travel.TravelCheck
 import com.sleepyhead.app.ui.MainActivity
 
 /**
@@ -29,6 +30,8 @@ class LockService : AccessibilityService() {
         val store = (application as SleepyheadApp).store
         val data = store.data.value
         if (pkg !in data.settings.blockedPackages) return
+        // Decide home or away first. With a fresh location fix this finishes right away.
+        TravelCheck.runIfNeeded(this, store)
         if (!store.isLockActive()) return
 
         val now = SystemClock.elapsedRealtime()

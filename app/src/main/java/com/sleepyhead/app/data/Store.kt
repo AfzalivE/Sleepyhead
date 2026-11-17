@@ -45,11 +45,35 @@ class Store(context: Context) {
         Routine.isLockActive(_data.value, now)
 
     @Synchronized
-    fun scan(text: String, now: LocalDateTime = LocalDateTime.now()): Routine.ScanResult {
+    fun scan(text: String, now: LocalDateTime = LocalDateTime.now()): Routine.ProofResult {
         val (next, result) = Routine.applyScan(_data.value, text, now, ZoneId.systemDefault())
         update { next }
         return result
     }
+
+    @Synchronized
+    fun tapTag(tagId: String?, tagCode: String?, now: LocalDateTime = LocalDateTime.now()): Routine.ProofResult {
+        val (next, result) = Routine.applyTag(_data.value, tagId, tagCode, now, ZoneId.systemDefault())
+        update { next }
+        return result
+    }
+
+    /** Pairs an NFC tag with a step. A tag can belong to one step only. */
+    fun pairTag(stepId: String, tagId: String) = update { d ->
+        d.copy(steps = d.steps.map {
+            when {
+                it.id == stepId -> it.copy(nfcTagId = tagId)
+                it.nfcTagId.equals(tagId, ignoreCase = true) -> it.copy(nfcTagId = null)
+                else -> it
+            }
+        })
+    }
+
+    fun unpairTag(stepId: String) = update { d ->
+        d.copy(steps = d.steps.map { if (it.id == stepId) it.copy(nfcTagId = null) else it })
+    }
+
+    fun setAwayToday(away: Boolean, now: LocalDateTime = LocalDateTime.now()) = updateToday(now) { it.copy(away = away) }
 
     fun skipToday(now: LocalDateTime = LocalDateTime.now()) = updateToday(now) { it.copy(skipped = true) }
 

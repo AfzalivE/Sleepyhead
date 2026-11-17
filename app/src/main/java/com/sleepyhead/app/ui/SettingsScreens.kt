@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Nfc
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -40,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -55,18 +58,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sleepyhead.app.data.AppData
+import com.sleepyhead.app.data.HomeLocation
 import com.sleepyhead.app.data.Routine
 import com.sleepyhead.app.data.Step
 import com.sleepyhead.app.data.Store
 import com.sleepyhead.app.lock.LockService
+import com.sleepyhead.app.nfc.NfcHub
+import com.sleepyhead.app.travel.TravelCheck
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.format.TextStyle
@@ -95,108 +102,196 @@ fun <T> rememberOnResume(read: () -> T): T {
 
 @Composable
 fun SettingsScreen(store: Store, data: AppData, go: (Screen) -> Unit, modifier: Modifier) {
-    val context = LocalContext.current
     val locked = Routine.isLockActive(data, LocalDateTime.now())
-    val lockOn = rememberOnResume { LockService.isEnabled(context) }
-    var cameraOk by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-    }
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { cameraOk = it }
     val s = data.settings
-    var editTime by remember { mutableStateOf<String?>(null) }
 
     Column(modifier.padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         TopBar("Settings") { go(Screen.Home) }
 
         Section("Setup")
-        SetupRow(
-            "Morning lock (Accessibility)",
-            if (lockOn) "On. Blocked apps send you back to your routine." else "Off. Sleepyhead cannot block apps yet.",
-            done = lockOn,
-            action = "Turn on",
-        ) {
-            context.startActivity(Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
-        SetupRow("Camera", if (cameraOk) "Allowed. You can scan codes." else "Needed to scan your QR codes.", cameraOk, "Allow") {
-            cameraLauncher.launch(Manifest.permission.CAMERA)
-        }
+        PermissionsSection()
         SetupRow("Printed QR codes", "Print one code for each step and put it in that place.", null, "Open") { go(Screen.Codes) }
-        if (!lockOn) {
-            Text(
-                "Tip: on Android 13 and newer, a sideloaded app can show \"Restricted setting\". " +
-                    "Open App info for Sleepyhead, tap the ⋮ menu, choose \"Allow restricted settings\", then try again.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 4.dp),
-            )
-            TextButton(onClick = {
-                context.startActivity(
-                    Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
-            }) { Text("Open App info") }
-        }
 
-        Section("Morning")
+        Section("Morning lock")
         if (locked) {
-            Text(
-                "Your morning lock is on. You can change the routine after you finish it.",
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
+            Hint("Your morning lock is on. You can change these settings after you finish your routine.", highlight = true)
         }
-        TimeRow("Wake-up (lock starts)", s.wakeMinutes, !locked) { editTime = "wake" }
-        TimeRow("At my desk by (on time)", s.targetMinutes, !locked) { editTime = "target" }
-        TimeRow("Lock ends no matter what", s.lockEndMinutes, !locked) { editTime = "end" }
-
-        Text("Days", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-            DayOfWeek.entries.forEach { d ->
-                val on = d.value in s.days
-                FilterChip(
-                    selected = on,
-                    enabled = !locked,
-                    onClick = { store.updateSettings { it.copy(days = if (on) it.days - d.value else it.days + d.value) } },
-                    label = { Text(d.getDisplayName(TextStyle.NARROW, Locale.getDefault())) },
-                )
-            }
-        }
+        ScheduleSection(store, data, enabled = !locked)
 
         Section("Routine")
-        SetupRow("Steps", data.steps.joinToString(" → ") { it.title }, null, "Edit", enabled = !locked) { go(Screen.Steps) }
+        SetupRow(
+            "Steps",
+            data.steps.joinToString(" → ") { it.title + if (it.nfcTagId != null) " (NFC)" else "" },
+            null, "Edit", enabled = !locked,
+        ) { go(Screen.Steps) }
         SetupRow("Blocked apps", "${s.blockedPackages.size} apps blocked in the morning", null, "Choose", enabled = !locked) {
             go(Screen.Apps)
         }
 
+        Section("Travel")
+        TravelSection(store, data, enabled = !locked)
+
         Section("Testing")
-        Text(
-            "To try it now, set the wake-up time to a few minutes ago, then open a blocked app.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Hint("To try it now, set the lock start to a few minutes ago, then open a blocked app.")
         OutlinedButton(onClick = { store.resetToday() }, modifier = Modifier.padding(vertical = 8.dp)) {
             Text("Clear today's progress")
         }
+        OutlinedButton(onClick = { store.updateSettings { it.copy(onboarded = false) } }) {
+            Text("Show the welcome steps again")
+        }
         Spacer(Modifier.height(32.dp))
+    }
+}
+
+/** Accessibility, camera and NFC status, with buttons to fix each one. */
+@Composable
+fun PermissionsSection() {
+    val context = LocalContext.current
+    val lockOn = rememberOnResume { LockService.isEnabled(context) }
+    val nfcOn = rememberOnResume { NfcHub.isEnabled(context) }
+    var cameraOk by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { cameraOk = it }
+
+    SetupRow(
+        "Morning lock (Accessibility)",
+        if (lockOn) "On. Blocked apps send you back to your routine." else "Off. Sleepyhead cannot block apps yet.",
+        done = lockOn,
+        action = "Turn on",
+    ) {
+        context.startActivity(Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+    if (!lockOn) {
+        Hint(
+            "On Android 13 and newer, a sideloaded app can show \"Restricted setting\". " +
+                "Open App info for Sleepyhead, tap the ⋮ menu, choose \"Allow restricted settings\", then try again."
+        )
+        TextButton(onClick = {
+            context.startActivity(
+                Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }) { Text("Open App info") }
+    }
+    SetupRow("Camera", if (cameraOk) "Allowed. You can scan QR codes." else "Needed to scan QR codes.", cameraOk, "Allow") {
+        cameraLauncher.launch(Manifest.permission.CAMERA)
+    }
+    if (NfcHub.isAvailable(context)) {
+        SetupRow("NFC", if (nfcOn) "On. You can use NFC tags." else "Off. Turn it on to use NFC tags.", nfcOn, "Turn on") {
+            context.startActivity(Intent(AndroidSettings.ACTION_NFC_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+}
+
+/** Lock start, lock end and days. */
+@Composable
+fun ScheduleSection(store: Store, data: AppData, enabled: Boolean) {
+    val s = data.settings
+    var editTime by remember { mutableStateOf<String?>(null) }
+    TimeRow("Lock starts (wake-up)", s.wakeMinutes, enabled) { editTime = "start" }
+    TimeRow("Lock ends", s.lockEndMinutes, enabled) { editTime = "end" }
+    if (s.lockEndMinutes <= s.wakeMinutes) {
+        Hint("The lock must end after it starts, on the same day.", highlight = true)
+    }
+    Hint("Finish your routine before the lock ends to keep your streak.")
+
+    Text("Days", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+        DayOfWeek.entries.forEach { d ->
+            val on = d.value in s.days
+            FilterChip(
+                selected = on,
+                enabled = enabled,
+                onClick = { store.updateSettings { it.copy(days = if (on) it.days - d.value else it.days + d.value) } },
+                label = { Text(d.getDisplayName(TextStyle.NARROW, Locale.getDefault())) },
+            )
+        }
     }
 
     editTime?.let { which ->
-        val initial = when (which) { "wake" -> s.wakeMinutes; "target" -> s.targetMinutes; else -> s.lockEndMinutes }
-        TimeDialog(initial, onDismiss = { editTime = null }) { m ->
-            store.updateSettings {
-                when (which) {
-                    "wake" -> it.copy(wakeMinutes = m)
-                    "target" -> it.copy(targetMinutes = m)
-                    else -> it.copy(lockEndMinutes = m)
-                }
-            }
+        TimeDialog(if (which == "start") s.wakeMinutes else s.lockEndMinutes, onDismiss = { editTime = null }) { m ->
+            store.updateSettings { if (which == "start") it.copy(wakeMinutes = m) else it.copy(lockEndMinutes = m) }
             editTime = null
         }
     }
 }
 
+/** Manual travel mode, home location, and the automatic home/away check. */
 @Composable
-private fun Section(title: String) {
+fun TravelSection(store: Store, data: AppData, enabled: Boolean) {
+    val context = LocalContext.current
+    val s = data.settings
+    var fgOk by remember { mutableStateOf(TravelCheck.hasForegroundPermission(context)) }
+    val bgOk = rememberOnResume { TravelCheck.hasBackgroundPermission(context) }
+    var bgNow by remember { mutableStateOf(bgOk) }
+    var locating by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf<String?>(null) }
+
+    val fgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        fgOk = TravelCheck.hasForegroundPermission(context)
+    }
+    val bgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        bgNow = TravelCheck.hasBackgroundPermission(context)
+    }
+    val backgroundGranted = bgOk || bgNow
+
+    SwitchRow(
+        "Travel mode",
+        "The lock stays off until you turn this off.",
+        s.travelMode, enabled,
+    ) { v -> store.updateSettings { it.copy(travelMode = v) } }
+
+    SwitchRow(
+        "Turn off the lock when I'm away",
+        "At lock start, Sleepyhead checks your location. If you are not at home, the lock stays off that day.",
+        s.autoTravel, enabled && s.home != null && fgOk,
+    ) { v -> store.updateSettings { it.copy(autoTravel = v) } }
+
+    if (!fgOk) {
+        SetupRow("Location", "Needed to know if you are at home. Approximate location is enough.", false, "Allow") {
+            fgLauncher.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+        }
+    } else if (!backgroundGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        SetupRow(
+            "Location all the time",
+            "The check runs at lock start, when Sleepyhead is closed. Choose \"Allow all the time\".",
+            false, "Allow",
+        ) { bgLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION) }
+    }
+
+    val home = s.home
+    SetupRow(
+        "Home",
+        when {
+            locating -> "Finding your location…"
+            home != null -> "Saved. Anywhere within ${s.homeRadiusMeters / 1000} km counts as home."
+            else -> "Not set. Set it while you are at home."
+        },
+        null,
+        if (home == null) "Set to here" else "Update to here",
+        enabled = enabled && fgOk && !locating,
+    ) {
+        locating = true
+        status = null
+        TravelCheck.currentLocation(context) { loc ->
+            locating = false
+            if (loc == null) {
+                status = "Could not find your location. Check that location is on, then try again."
+            } else {
+                store.updateSettings { it.copy(home = HomeLocation(loc.latitude, loc.longitude)) }
+                status = "Home saved."
+            }
+        }
+    }
+    status?.let { Hint(it, highlight = true) }
+    if (s.autoTravel && !backgroundGranted) {
+        Hint("Without \"all the time\" location, the check runs only when you open Sleepyhead or a blocked app.")
+    }
+}
+
+@Composable
+fun Section(title: String) {
     Text(
         title.uppercase(),
         style = MaterialTheme.typography.labelLarge,
@@ -206,7 +301,17 @@ private fun Section(title: String) {
 }
 
 @Composable
-private fun SetupRow(
+fun Hint(text: String, highlight: Boolean = false) {
+    Text(
+        text,
+        style = if (highlight) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+        color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(vertical = 4.dp),
+    )
+}
+
+@Composable
+fun SetupRow(
     title: String,
     subtitle: String,
     done: Boolean?,
@@ -225,6 +330,20 @@ private fun SetupRow(
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (done != true) TextButton(onClick = onClick, enabled = enabled) { Text(action) }
+    }
+}
+
+@Composable
+private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = enabled) { onChange(!checked) }.padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
     }
 }
 
@@ -258,16 +377,24 @@ private fun TimeDialog(initial: Int, onDismiss: () -> Unit, onPick: (Int) -> Uni
 
 @Composable
 fun AppsScreen(store: Store, data: AppData, onBack: () -> Unit, modifier: Modifier) {
+    Column(modifier.padding(horizontal = 16.dp)) {
+        TopBar("Blocked apps", onBack)
+        AppsList(store, data, Modifier.weight(1f))
+    }
+}
+
+@Composable
+fun AppsList(store: Store, data: AppData, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val apps = remember { InstalledApps.load(context) }
     var query by remember { mutableStateOf("") }
     val blocked = data.settings.blockedPackages
-    val shown = apps
-        .filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
-        .sortedByDescending { it.packageName in blocked }
-
-    Column(modifier.padding(horizontal = 16.dp)) {
-        TopBar("Blocked apps", onBack)
+    // Sort once per search, so a row does not jump when you tick it.
+    val shown = remember(query, apps) {
+        apps.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
+            .sortedByDescending { it.packageName in blocked }
+    }
+    Column(modifier) {
         Text(
             "These apps send you back to your routine during the morning lock.",
             style = MaterialTheme.typography.bodyMedium,
@@ -301,65 +428,98 @@ fun AppsScreen(store: Store, data: AppData, onBack: () -> Unit, modifier: Modifi
 @Composable
 fun StepsScreen(store: Store, data: AppData, onBack: () -> Unit, modifier: Modifier) {
     var confirmNewCodes by remember { mutableStateOf(false) }
-    var deleting by remember { mutableIntStateOf(-1) }
-    val steps = data.steps
-
-    fun save(list: List<Step>) = store.setSteps(list)
-
     Column(modifier.padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
         TopBar("Steps", onBack)
-        Text(
-            "Do the steps in this order. Each step needs its own printed code in its place.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        steps.forEachIndexed { i, step ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                Column(Modifier.padding(12.dp)) {
-                    OutlinedTextField(
-                        value = step.title, label = { Text("Step ${i + 1}") }, singleLine = true,
-                        onValueChange = { v -> save(steps.toMutableList().also { it[i] = step.copy(title = v) }) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = step.place, label = { Text("Place (where the code goes)") }, singleLine = true,
-                        onValueChange = { v -> save(steps.toMutableList().also { it[i] = step.copy(place = v) }) },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    )
-                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                        IconButton(enabled = i > 0, onClick = {
-                            save(steps.toMutableList().also { java.util.Collections.swap(it, i, i - 1) })
-                        }) { Icon(Icons.Outlined.ArrowUpward, "Move up") }
-                        IconButton(enabled = i < steps.size - 1, onClick = {
-                            save(steps.toMutableList().also { java.util.Collections.swap(it, i, i + 1) })
-                        }) { Icon(Icons.Outlined.ArrowDownward, "Move down") }
-                        IconButton(onClick = { deleting = i }) { Icon(Icons.Outlined.Delete, "Delete") }
-                    }
-                }
-            }
-        }
-        Button(onClick = { save(steps + store.newStep("New step", "Somewhere")) }, modifier = Modifier.padding(vertical = 8.dp)) {
-            Icon(Icons.Outlined.Add, null); Spacer(Modifier.size(8.dp)); Text("Add step")
-        }
+        StepsEditor(store, data)
         HorizontalDivider(Modifier.padding(vertical = 16.dp))
-        Text(
-            "If someone copied your codes, or you want a fresh set, make new codes. Old printed codes stop working.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Hint("If someone copied your codes, or you want a fresh set, make new QR codes. Old printed codes stop working. Paired NFC tags keep working.")
         OutlinedButton(onClick = { confirmNewCodes = true }, modifier = Modifier.padding(vertical = 8.dp)) {
-            Text("Make new codes")
+            Text("Make new QR codes")
         }
         Spacer(Modifier.height(32.dp))
     }
-
     if (confirmNewCodes) {
         AlertDialog(
             onDismissRequest = { confirmNewCodes = false },
-            title = { Text("Make new codes?") },
+            title = { Text("Make new QR codes?") },
             text = { Text("You must print the codes again. The old ones stop working.") },
             confirmButton = { TextButton(onClick = { store.regenerateCodes(); confirmNewCodes = false }) { Text("Make new codes") } },
             dismissButton = { TextButton(onClick = { confirmNewCodes = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+/** Edit, reorder, add and delete steps, and pair an NFC tag with each one. */
+@Composable
+fun StepsEditor(store: Store, data: AppData) {
+    val context = LocalContext.current
+    var deleting by remember { mutableIntStateOf(-1) }
+    val pairing by NfcHub.pairing.collectAsStateWithLifecycle()
+    val steps = data.steps
+    val hasNfc = remember { NfcHub.isAvailable(context) }
+
+    fun save(list: List<Step>) = store.setSteps(list)
+
+    Hint(
+        "Do the steps in this order. You prove each step with its printed QR code" +
+            (if (hasNfc) " or an NFC tag that you put in that place." else ".")
+    )
+    steps.forEachIndexed { i, step ->
+        Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            Column(Modifier.padding(12.dp)) {
+                OutlinedTextField(
+                    value = step.title, label = { Text("Step ${i + 1}") }, singleLine = true,
+                    onValueChange = { v -> save(steps.toMutableList().also { it[i] = step.copy(title = v) }) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = step.place, label = { Text("Place (where the code or tag goes)") }, singleLine = true,
+                    onValueChange = { v -> save(steps.toMutableList().also { it[i] = step.copy(place = v) }) },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    if (hasNfc) {
+                        if (step.nfcTagId == null) {
+                            TextButton(onClick = { NfcHub.startPairing(step.id) }) {
+                                Icon(Icons.Outlined.Nfc, null); Spacer(Modifier.size(6.dp)); Text("Pair NFC tag")
+                            }
+                        } else {
+                            TextButton(onClick = { store.unpairTag(step.id) }) {
+                                Icon(Icons.Outlined.Nfc, null); Spacer(Modifier.size(6.dp)); Text("Remove tag")
+                            }
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(enabled = i > 0, onClick = {
+                        save(steps.toMutableList().also { java.util.Collections.swap(it, i, i - 1) })
+                    }) { Icon(Icons.Outlined.ArrowUpward, "Move up") }
+                    IconButton(enabled = i < steps.size - 1, onClick = {
+                        save(steps.toMutableList().also { java.util.Collections.swap(it, i, i + 1) })
+                    }) { Icon(Icons.Outlined.ArrowDownward, "Move down") }
+                    IconButton(onClick = { deleting = i }) { Icon(Icons.Outlined.Delete, "Delete") }
+                }
+            }
+        }
+    }
+    Button(onClick = { save(steps + store.newStep("New step", "Somewhere")) }, modifier = Modifier.padding(vertical = 8.dp)) {
+        Icon(Icons.Outlined.Add, null); Spacer(Modifier.size(8.dp)); Text("Add step")
+    }
+
+    pairing?.let { id ->
+        val step = steps.firstOrNull { it.id == id }
+        AlertDialog(
+            onDismissRequest = { NfcHub.cancelPairing() },
+            icon = { Icon(Icons.Outlined.Nfc, null) },
+            title = { Text("Hold your phone to the tag") },
+            text = {
+                Text(
+                    "Touch the back of your phone to the NFC tag for \"${step?.title}\". " +
+                        (if (!NfcHub.isEnabled(context)) "NFC is off. Turn it on in system settings first. " else "") +
+                        "Then put the tag in ${step?.place}."
+                )
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { NfcHub.cancelPairing() }) { Text("Cancel") } },
         )
     }
     if (deleting in steps.indices) {

@@ -92,15 +92,7 @@ fun HomeScreen(
 
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         val text = result.contents ?: return@rememberLauncherForActivityResult
-        message = when (val r = store.scan(text)) {
-            is Routine.ScanResult.Completed ->
-                if (r.routineDone) "All done. Good morning!" else "Nice. \"${r.step.title}\" is done."
-            is Routine.ScanResult.WrongOrder ->
-                "That is the code for ${r.scanned.place}. First: ${r.expected.title} (${r.expected.place})."
-            is Routine.ScanResult.AlreadyDone -> "\"${r.step.title}\" is already done today."
-            Routine.ScanResult.NothingLeft -> "Your routine is already done today."
-            Routine.ScanResult.Unknown -> "This is not one of your Sleepyhead codes."
-        }
+        message = proofMessage(store.scan(text))
     }
     fun scan() {
         val opts = ScanOptions()
@@ -133,6 +125,12 @@ fun HomeScreen(
 
         Spacer(Modifier.weight(1f))
 
+        when (Routine.travelState(data, today)) {
+            Routine.TravelState.Manual -> Small("✈ Travel mode is on. The morning lock is off until you turn it off in Settings.")
+            Routine.TravelState.Away -> Small("✈ You were away from home at lock start, so the lock is off today.")
+            null -> Unit
+        }
+
         val finishedAt = log?.completedAtMillis
         when {
             finishedAt != null -> DoneView(finishedAt, log.onTime, streak)
@@ -142,7 +140,7 @@ fun HomeScreen(
                 TextButton(onClick = { store.undoSkipToday() }) { Text("Undo skip") }
             }
             next == null -> Big("Add a step in Settings to start.")
-            else -> NextStepView(data, now, next.title, next.place, lockActive) { scan() }
+            else -> NextStepView(data, now, next.title, next.place, next.nfcTagId != null, lockActive) { scan() }
         }
 
         Spacer(Modifier.weight(1f))
@@ -163,6 +161,7 @@ private fun NextStepView(
     now: LocalDateTime,
     title: String,
     place: String,
+    hasTag: Boolean,
     lockActive: Boolean,
     onScan: () -> Unit,
 ) {
@@ -182,11 +181,8 @@ private fun NextStepView(
             fontWeight = FontWeight.Light,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        val left = s.targetMinutes - nowMin
-        Small(
-            if (left > 0) "since ${minutesToText(s.wakeMinutes)}. Be at your desk by ${minutesToText(s.targetMinutes)} ($left min)."
-            else "since ${minutesToText(s.wakeMinutes)}. Past ${minutesToText(s.targetMinutes)}, but finish anyway."
-        )
+        val left = s.lockEndMinutes - nowMin
+        Small("since ${minutesToText(s.wakeMinutes)}. Lock ends at ${minutesToText(s.lockEndMinutes)} ($left min).")
     } else if (Routine.isRoutineDay(s, now.toLocalDate()) && nowMin < s.wakeMinutes) {
         Small("Your morning starts at ${minutesToText(s.wakeMinutes)}. Sleep well.")
     } else {
@@ -203,6 +199,9 @@ private fun NextStepView(
         Spacer(Modifier.size(12.dp))
         Text("I'm here. Scan the code", fontSize = 18.sp)
     }
+    if (hasTag) {
+        Small("Or tap your phone on the NFC tag in $place.")
+    }
 }
 
 @Composable
@@ -211,7 +210,7 @@ private fun DoneView(finishedAt: Long, onTime: Boolean, streak: Int) {
     Text("☀", fontSize = 64.sp, color = MaterialTheme.colorScheme.primary)
     Spacer(Modifier.height(16.dp))
     Big("You're at your desk.")
-    Small(if (onTime) "Done at $t. On time." else "Done at $t. A little late, but you did it.")
+    Small(if (onTime) "Done at $t." else "Done at $t, after the lock ended. You still did it.")
     if (streak > 0) {
         Spacer(Modifier.height(24.dp))
         Text("$streak", fontSize = 56.sp, fontWeight = FontWeight.Light)
@@ -267,9 +266,9 @@ private fun HoldToSkip(onSkip: () -> Unit) {
 }
 
 @Composable
-fun Notice(text: String, onDismiss: () -> Unit) {
+fun Notice(text: String, modifier: Modifier = Modifier, onDismiss: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(top = 8.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
