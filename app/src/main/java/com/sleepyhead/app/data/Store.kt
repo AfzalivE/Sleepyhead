@@ -62,7 +62,7 @@ class Store(context: Context) {
     fun pairTag(stepId: String, tagId: String) = update { d ->
         d.copy(steps = d.steps.map {
             when {
-                it.id == stepId -> it.copy(nfcTagId = tagId)
+                it.id == stepId -> it.copy(nfcTagId = tagId, testedAtMillis = System.currentTimeMillis())
                 it.nfcTagId.equals(tagId, ignoreCase = true) -> it.copy(nfcTagId = null)
                 else -> it
             }
@@ -99,7 +99,11 @@ class Store(context: Context) {
     fun newStep(title: String, place: String): Step = Step(id = randomToken(6), title = title, place = place, code = newCode())
 
     /** Makes new codes for every step. Old printed codes stop working. */
-    fun regenerateCodes() = update { d -> d.copy(steps = d.steps.map { it.copy(code = newCode()) }) }
+    fun regenerateCodes() = update { d -> d.copy(steps = d.steps.map { it.copy(code = newCode(), testedAtMillis = null) }) }
+
+    fun markTested(stepId: String) = update { d ->
+        d.copy(steps = d.steps.map { if (it.id == stepId) it.copy(testedAtMillis = System.currentTimeMillis()) else it })
+    }
 
     fun today(): LocalDate = LocalDate.now()
 

@@ -12,6 +12,8 @@ data class Step(
     val code: String,
     /** Hex ID of the NFC tag paired with this step, or null. */
     val nfcTagId: String? = null,
+    /** When this step's code or tag last passed a test in Settings, or null. */
+    val testedAtMillis: Long? = null,
 )
 
 @Serializable

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 sealed interface NfcEvent {
     data class Proof(val result: Routine.ProofResult) : NfcEvent
     data class Paired(val stepTitle: String, val wroteTag: Boolean) : NfcEvent
+    data class Test(val tested: com.sleepyhead.app.data.Step, val result: Routine.TestResult) : NfcEvent
 }
 
 /**
@@ -38,6 +39,23 @@ object NfcHub {
     val event: StateFlow<NfcEvent?> = _event.asStateFlow()
 
     fun clearEvent() { _event.value = null }
+
+    private val _testing = MutableStateFlow<String?>(null)
+    /** The step being tested in Settings. While set, a tag is only checked, never counted. */
+    val testing: StateFlow<String?> = _testing.asStateFlow()
+
+    fun startTesting(stepId: String) { _testing.value = stepId }
+    fun stopTesting() { _testing.value = null }
+
+    /** Shows a test result and remembers a passed test. Used for both QR and NFC tests. */
+    fun reportTest(store: Store, stepId: String, found: com.sleepyhead.app.data.Step?) {
+        val data = store.data.value
+        val tested = data.steps.firstOrNull { it.id == stepId } ?: return
+        val result = Routine.testStep(data, stepId, found)
+        if (result == Routine.TestResult.Works) store.markTested(stepId)
+        _testing.value = null
+        _event.value = NfcEvent.Test(tested, result)
+    }
 
     fun startPairing(stepId: String) { _pairing.value = stepId }
     fun cancelPairing() { _pairing.value = null }
@@ -84,6 +102,12 @@ object NfcHub {
             return
         }
         val code = runCatching { Ndef.get(tag)?.cachedNdefMessage?.let { codeFrom(it) } }.getOrNull()
+        val testingId = _testing.value
+        if (testingId != null) {
+            val data = store.data.value
+            reportTest(store, testingId, Routine.stepForTag(data, tagId) ?: Routine.stepForCode(data, code))
+            return
+        }
         _event.value = (NfcEvent.Proof(store.tapTag(tagId, code)))
     }
 

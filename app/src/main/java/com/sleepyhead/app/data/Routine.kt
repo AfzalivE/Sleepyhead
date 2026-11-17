@@ -51,6 +51,33 @@ object Routine {
         return !isFinished(log) && log?.away == null
     }
 
+    /** When the next lock starts after [now]: later today, or the next routine day. Null if no days are set. */
+    fun nextLockStart(settings: Settings, now: LocalDateTime): LocalDateTime? {
+        var day = now.toLocalDate()
+        repeat(8) {
+            val start = day.atStartOfDay().plusMinutes(settings.wakeMinutes.toLong())
+            if (isRoutineDay(settings, day) && start.isAfter(now)) return start
+            day = day.plusDays(1)
+        }
+        return null
+    }
+
+    enum class DayStatus { OnTime, Late, Skipped, Away, Missed, Pending, DayOff }
+
+    /** A one-word summary of a day, for the 7-day strip. */
+    fun dayStatus(data: AppData, date: LocalDate, now: LocalDateTime): DayStatus {
+        val log = data.logs[date.toString()]
+        return when {
+            log?.completedAtMillis != null -> if (log.onTime) DayStatus.OnTime else DayStatus.Late
+            log?.skipped == true -> DayStatus.Skipped
+            isTravelDay(data, date) -> DayStatus.Away
+            !isRoutineDay(data.settings, date) -> DayStatus.DayOff
+            date.isAfter(now.toLocalDate()) -> DayStatus.Pending
+            date == now.toLocalDate() && minutesOfDay(now) < data.settings.lockEndMinutes -> DayStatus.Pending
+            else -> DayStatus.Missed
+        }
+    }
+
     fun distanceMeters(aLat: Double, aLon: Double, bLat: Double, bLon: Double): Double {
         val r = 6_371_000.0
         val dLat = Math.toRadians(bLat - aLat)
@@ -76,6 +103,21 @@ object Routine {
         data class AlreadyDone(val step: Step) : ProofResult
         data object Unknown : ProofResult
         data object NothingLeft : ProofResult
+        /** Outside the lock window a scan is only a test: it names the step and counts nothing. */
+        data class Tested(val step: Step) : ProofResult
+    }
+
+    sealed interface TestResult {
+        data object Works : TestResult
+        data class OtherStep(val step: Step) : TestResult
+        data object Unknown : TestResult
+    }
+
+    /** Checks a scanned code or tag against the step you are testing. Changes nothing. */
+    fun testStep(data: AppData, expectedStepId: String, found: Step?): TestResult = when {
+        found == null -> TestResult.Unknown
+        found.id == expectedStepId -> TestResult.Works
+        else -> TestResult.OtherStep(found)
     }
 
     fun stepForCode(data: AppData, code: String?): Step? =
@@ -92,6 +134,7 @@ object Routine {
         zone: ZoneId = ZoneId.systemDefault(),
     ): Pair<AppData, ProofResult> {
         step ?: return data to ProofResult.Unknown
+        if (!inMorningWindow(data.settings, now)) return data to ProofResult.Tested(step)
         val date = now.toLocalDate()
         val key = date.toString()
         val log = data.logs[key] ?: DayLog(date = key)

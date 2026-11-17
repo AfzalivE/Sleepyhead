@@ -81,7 +81,8 @@ fun OnboardingScreen(store: Store, data: AppData, modifier: Modifier) {
                     "You can skip this and set it up later in Settings.")
                 TravelSection(store, data, enabled = true)
                 Spacer(Modifier.height(16.dp))
-                Para("Last step: print your QR codes and put each one in its place.")
+                Para("Last step: print your QR codes and put each one in its place. " +
+                    "Then test each one with the Test button in Settings → Steps.")
                 OutlinedButton(onClick = { (context as? Activity)?.let { QrCodes.print(it, data.steps) } }) {
                     Icon(Icons.Outlined.Print, null); Spacer(Modifier.size(8.dp)); Text("Print or save as PDF")
                 }

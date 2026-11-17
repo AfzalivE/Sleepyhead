@@ -68,6 +68,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.sleepyhead.app.data.AppData
 import com.sleepyhead.app.data.HomeLocation
 import com.sleepyhead.app.data.Routine
@@ -483,6 +485,14 @@ fun StepsEditor(store: Store, data: AppData) {
     val context = LocalContext.current
     var deleting by remember { mutableIntStateOf(-1) }
     val pairing by NfcHub.pairing.collectAsStateWithLifecycle()
+    val testing by NfcHub.testing.collectAsStateWithLifecycle()
+    // A QR test only checks the code. It never marks the step done.
+    val testScanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val id = NfcHub.testing.value ?: return@rememberLauncherForActivityResult
+        val text = result.contents
+        if (text == null) { NfcHub.stopTesting(); return@rememberLauncherForActivityResult }
+        NfcHub.reportTest(store, id, Routine.stepForCode(store.data.value, text))
+    }
     val steps = data.steps
     val hasNfc = remember { NfcHub.isAvailable(context) }
 
@@ -505,6 +515,23 @@ fun StepsEditor(store: Store, data: AppData) {
                     onValueChange = { v -> save(steps.toMutableList().also { it[i] = step.copy(place = v) }) },
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 )
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                    Text(
+                        if (step.testedAtMillis != null) "✓ Tested" else "Not tested",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (step.testedAtMillis != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f).padding(start = 4.dp),
+                    )
+                    OutlinedButton(onClick = {
+                        NfcHub.startTesting(step.id)
+                        if (step.nfcTagId == null || !NfcHub.isEnabled(context)) {
+                            testScanner.launch(
+                                ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                    .setPrompt("Test: scan the code for ${step.place}").setBeepEnabled(false).setOrientationLocked(false)
+                            )
+                        }
+                    }) { Text("Test") }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     if (hasNfc) {
                         if (step.nfcTagId == null) {
@@ -531,6 +558,28 @@ fun StepsEditor(store: Store, data: AppData) {
     }
     Button(onClick = { save(steps + store.newStep("New step", "Somewhere")) }, modifier = Modifier.padding(vertical = 8.dp)) {
         Icon(Icons.Outlined.Add, null); Spacer(Modifier.size(8.dp)); Text("Add step")
+    }
+
+    // Steps with a tag: tap the tag, or scan the QR code instead.
+    testing?.let { id ->
+        val step = steps.firstOrNull { it.id == id }
+        if (step?.nfcTagId != null && NfcHub.isEnabled(context)) {
+            AlertDialog(
+                onDismissRequest = { NfcHub.stopTesting() },
+                icon = { Icon(Icons.Outlined.Nfc, null) },
+                title = { Text("Test \"${step.title}\"") },
+                text = { Text("Hold your phone to the tag in ${step.place}, or scan its QR code. This is only a test. It does not mark the step done.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        testScanner.launch(
+                            ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                .setPrompt("Test: scan the code for ${step.place}").setBeepEnabled(false).setOrientationLocked(false)
+                        )
+                    }) { Text("Scan QR instead") }
+                },
+                dismissButton = { TextButton(onClick = { NfcHub.stopTesting() }) { Text("Cancel") } },
+            )
+        }
     }
 
     pairing?.let { id ->

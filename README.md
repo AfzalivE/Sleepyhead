@@ -12,8 +12,9 @@ instead of reading news, social media and work chat in bed.
   your routine, or at lock end.
 - **Proof-based checklist.** Each step of your routine has a printed QR code, an NFC tag, or both, in its place:
   bathroom, kitchen, desk. You finish a step only when you scan its code or tap its tag. You must do the steps in order.
-- **Calm start screen.** The screen shows only the next step, a timer since lock start,
-  and the time left until lock end.
+- **Calm start screen.** During the lock, the screen shows only the next step, a timer since lock start,
+  and the time left until lock end. Outside the lock, it shows when your next morning starts,
+  your streak and the last 7 days.
 - **Streaks and log.** A morning counts when you finish before lock end. You see your current streak,
   your best streak, and a 30-day log. The log also counts how often you reached for a blocked app.
 - **Travel mode.** Save your home location once. At lock start, if your phone is away from home,
@@ -73,6 +74,12 @@ The first launch shows these steps as onboarding. Settings → *Show the welcome
 
 Each install makes its own random codes. If you reinstall the app, or tap *Make new QR codes*
 in Settings → Steps, print the codes again.
+
+## Test your codes
+
+Settings → Steps → **Test** on each step. Scan the step's QR code or tap its NFC tag. Sleepyhead confirms
+that it is the right code, and it marks the step "Tested". A test never counts as doing the step.
+Outside the lock window, a scan on Home also never counts, so you cannot finish tomorrow's routine tonight.
 
 ## Try it now
 

@@ -135,10 +135,16 @@ fun proofMessage(r: Routine.ProofResult): String = when (r) {
         "That is the ${r.scanned.place} step. First: ${r.expected.title} (${r.expected.place})."
     is Routine.ProofResult.AlreadyDone -> "\"${r.step.title}\" is already done today."
     Routine.ProofResult.NothingLeft -> "Your routine is already done today."
+    is Routine.ProofResult.Tested -> "This is the code for \"${r.step.title}\". It does not count now, because the morning lock is not on. To check your codes, use Test in Settings → Steps."
     Routine.ProofResult.Unknown -> "This is not one of your Sleepyhead codes or tags."
 }
 
 fun nfcMessage(e: NfcEvent): String = when (e) {
+    is NfcEvent.Test -> when (val r = e.result) {
+        Routine.TestResult.Works -> "✓ The ${e.tested.place} code works for \"${e.tested.title}\"."
+        is Routine.TestResult.OtherStep -> "That is the ${r.step.place} code (\"${r.step.title}\"), not ${e.tested.place}."
+        Routine.TestResult.Unknown -> "Not a current Sleepyhead code. Print or pair \"${e.tested.title}\" again."
+    }
     is NfcEvent.Proof -> proofMessage(e.result)
     is NfcEvent.Paired ->
         if (e.wroteTag) "Tag paired with \"${e.stepTitle}\". A tap now opens Sleepyhead, even when it is closed."

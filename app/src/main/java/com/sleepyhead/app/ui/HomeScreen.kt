@@ -159,7 +159,9 @@ fun HomeScreen(
 
         val travel = Routine.isTravelDay(data, today)
         val finishedAt = log?.completedAtMillis
+        val inWindow = Routine.inMorningWindow(data.settings, now)
         when {
+            !inWindow -> RestView(data, now, streak) { go(Screen.Steps) }
             finishedAt != null -> DoneView(finishedAt, log.onTime, streak, Routine.bestStreak(data), justFinished)
             travel -> {
                 Text("✈", fontSize = 56.sp, color = MaterialTheme.colorScheme.primary)
@@ -182,8 +184,10 @@ fun HomeScreen(
 
         Spacer(Modifier.weight(1f))
 
-        StepDots(data, today)
-        Spacer(Modifier.height(16.dp))
+        if (inWindow) {
+            StepDots(data, today)
+            Spacer(Modifier.height(16.dp))
+        }
         if (lockActive) {
             HoldToSkip { store.skipToday() }
         } else if (!LockService.isEnabled(context)) {
@@ -294,6 +298,94 @@ private fun StepDots(data: AppData, date: java.time.LocalDate) {
                 spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow), label = "dot-scale",
             )
             Box(Modifier.size(12.dp).graphicsLayer { scaleX = scale; scaleY = scale }.background(color, CircleShape))
+        }
+    }
+}
+
+/** Outside the lock window: when the next morning starts, how you are doing, and untested steps. */
+@Composable
+private fun RestView(data: AppData, now: LocalDateTime, streak: Int, onTestNow: () -> Unit) {
+    val s = data.settings
+    val today = now.toLocalDate()
+    val routineToday = Routine.isRoutineDay(s, today)
+    val beforeStart = routineToday && Routine.minutesOfDay(now) < s.wakeMinutes
+    val night = now.hour >= 20 || now.hour < 5
+
+    Text(if (night || beforeStart) "☾" else "☀", fontSize = 56.sp, color = MaterialTheme.colorScheme.secondary)
+    Spacer(Modifier.height(12.dp))
+    when {
+        beforeStart -> {
+            Big(if (night) "Sleep well" else "Rest up")
+            Small("Your morning starts at ${minutesToText(s.wakeMinutes)}.")
+        }
+        routineToday -> {
+            val log = data.logs[today.toString()]
+            val t = log?.completedAtMillis?.let {
+                Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
+            }
+            when (Routine.dayStatus(data, today, now)) {
+                Routine.DayStatus.OnTime -> { Big("Good morning, done"); Small("Today you finished at $t. Nice work.") }
+                Routine.DayStatus.Late -> { Big("You did it"); Small("Today you finished at $t, after the lock ended.") }
+                Routine.DayStatus.Skipped -> { Big("Today's morning is over"); Small("You skipped today. Tomorrow is a new morning.") }
+                Routine.DayStatus.Away -> { Big("No lock today"); Small("You were away from home this morning.") }
+                else -> { Big("Today's morning is over"); Small("Tomorrow is a new morning.") }
+            }
+        }
+        else -> {
+            Big("No lock today")
+            Small("Enjoy your day off.")
+        }
+    }
+    if (!beforeStart) {
+        Routine.nextLockStart(s, now)?.let { next ->
+            val day = when (next.toLocalDate()) {
+                today -> "Today"
+                today.plusDays(1) -> "Tomorrow"
+                else -> next.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+            }
+            Small("Next morning: $day, ${next.toLocalTime().format(timeFmt)}")
+        }
+    }
+    if (streak > 0) {
+        Spacer(Modifier.height(24.dp))
+        Text("$streak", fontSize = 44.sp, fontWeight = FontWeight.Light)
+        Small(if (streak == 1) "good morning in a row" else "good mornings in a row")
+    }
+    Spacer(Modifier.height(20.dp))
+    WeekStrip(data, now)
+    val untested = data.steps.count { it.testedAtMillis == null }
+    if (untested > 0) {
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = onTestNow) {
+            Text(if (untested == 1) "1 step not tested · Test now" else "$untested steps not tested · Test now")
+        }
+    }
+}
+
+/** The last 7 days: ✓ done, ◐ done late, – skipped, ✈ away, · day off, ✗ missed. */
+@Composable
+private fun WeekStrip(data: AppData, now: LocalDateTime) {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        (6 downTo 0).forEach { back ->
+            val date = now.toLocalDate().minusDays(back.toLong())
+            val status = Routine.dayStatus(data, date, now)
+            val (mark, color) = when (status) {
+                Routine.DayStatus.OnTime -> "✓" to MaterialTheme.colorScheme.primary
+                Routine.DayStatus.Late -> "◐" to MaterialTheme.colorScheme.primary
+                Routine.DayStatus.Skipped -> "–" to MaterialTheme.colorScheme.onSurfaceVariant
+                Routine.DayStatus.Away -> "✈" to MaterialTheme.colorScheme.secondary
+                Routine.DayStatus.DayOff -> "·" to MaterialTheme.colorScheme.onSurfaceVariant
+                Routine.DayStatus.Pending -> "○" to MaterialTheme.colorScheme.onSurfaceVariant
+                Routine.DayStatus.Missed -> "✗" to MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(mark, color = color, fontSize = 18.sp)
+                Text(
+                    date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, java.util.Locale.getDefault()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

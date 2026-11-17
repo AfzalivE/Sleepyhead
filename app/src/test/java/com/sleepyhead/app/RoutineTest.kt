@@ -49,10 +49,7 @@ class RoutineTest {
         assertEquals(1, Routine.streak(d4, LocalDate.of(2026, 11, 16)))
     }
 
-    @Test fun finishAfterLockEndIsNotOnTime() {
-        var d = base
-        listOf("CODE-A", "CODE-B", "CODE-C").forEach { d = Routine.applyScan(d, it, at(11, 5), ZoneOffset.UTC).first }
-        assertFalse(d.logs["2026-11-16"]!!.onTime)
+    @Test fun finishJustBeforeLockEndIsOnTime() {
         var e = base
         listOf("CODE-A", "CODE-B", "CODE-C").forEach { e = Routine.applyScan(e, it, at(10, 59), ZoneOffset.UTC).first }
         assertTrue(e.logs["2026-11-16"]!!.onTime)
@@ -90,6 +87,24 @@ class RoutineTest {
             logs = mapOf(ok("2026-11-12"), "2026-11-13" to DayLog(date = "2026-11-13", away = true), ok("2026-11-16")),
         )
         assertEquals(2, Routine.streak(d, LocalDate.of(2026, 11, 16)))
+    }
+
+    @Test fun scanOutsideWindowIsOnlyATest() {
+        val (d, r) = Routine.applyScan(base, "CODE-A", at(22, 0), ZoneOffset.UTC)
+        assertTrue(r is Routine.ProofResult.Tested)
+        assertEquals(d, base)
+    }
+
+    @Test fun nextLockStartSkipsWeekend() {
+        // Friday 2026-11-20 at 10:00 -> Monday 2026-11-23 at 6:30.
+        assertEquals(at(6, 30, LocalDate.of(2026, 11, 23)), Routine.nextLockStart(settings, at(10, 0, LocalDate.of(2026, 11, 20))))
+        assertEquals(at(6, 30), Routine.nextLockStart(settings, at(5, 0)))
+    }
+
+    @Test fun testingAStep() {
+        assertEquals(Routine.TestResult.Works, Routine.testStep(base, "a", Routine.stepForCode(base, "CODE-A")))
+        assertEquals(Routine.TestResult.OtherStep(steps[1]), Routine.testStep(base, "a", Routine.stepForCode(base, "CODE-B")))
+        assertEquals(Routine.TestResult.Unknown, Routine.testStep(base, "a", null))
     }
 
     @Test fun unknownCode() {
