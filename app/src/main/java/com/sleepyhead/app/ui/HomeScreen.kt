@@ -85,8 +85,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
-private val TopInk = Color(0xFFB4BCCB)
-
 private val timeFmt: DateTimeFormatter = DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
 
 fun minutesToText(m: Int): String = LocalTime.of(m / 60, m % 60).format(timeFmt)
@@ -148,7 +146,6 @@ fun HomeScreen(
     Box(modifier) {
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         // Top bar. Small and quiet on purpose. Always light: it sits on the dark top of the sky.
-        CompositionLocalProvider(LocalContentColor provides TopInk) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // The app name, with the streak in small text under it.
             Column(Modifier.weight(1f)) {
@@ -156,20 +153,19 @@ fun HomeScreen(
                     "Sleepyhead",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFE8ECF4),
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
                 if (streak > 0) {
                     Text(
                         "$streak-morning streak",
                         style = MaterialTheme.typography.labelMedium,
-                        color = TopInk,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             IconButton(onClick = { go(Screen.History) }) { Icon(Icons.Outlined.CalendarMonth, "History") }
             IconButton(onClick = { go(Screen.Codes) }) { Icon(Icons.Outlined.QrCode2, "QR codes") }
             IconButton(onClick = { go(Screen.Settings) }) { Icon(Icons.Outlined.Settings, "Settings") }
-        }
         }
 
         if (blockedFrom == MainActivity.BLOCKED_SETTINGS && lockActive) {
@@ -308,8 +304,8 @@ private fun DoneView(
     val zone = ZoneId.systemDefault()
     val t = Instant.ofEpochMilli(finishedAt).atZone(zone).toLocalTime().format(timeFmt)
     val mins = Insights.minutesToDesk(data.settings, data.logs[now.toLocalDate().toString()], zone)
-    // The sun is in the sky behind. Leave room for it.
-    Spacer(Modifier.height(150.dp))
+    RisingSun(animate = animate)
+    Spacer(Modifier.height(8.dp))
     Big(if (onTime && !lockOff) Encouragement.doneHeadline(streak) else "You're at your desk.")
     Small(
         when {
@@ -333,14 +329,14 @@ private fun DoneView(
         }
     }
     Spacer(Modifier.height(18.dp))
-    MiniWeek(data, now, animateToday = animate, letters = true, onLight = true)
+    MiniWeek(data, now, animateToday = animate, letters = true)
     Spacer(Modifier.height(16.dp))
     Text("Your phone is all yours ☀", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onBackground)
 }
 
 /** The last 7 days as squares. On the done screen, today's square pops in. */
 @Composable
-private fun MiniWeek(data: AppData, now: LocalDateTime, animateToday: Boolean, letters: Boolean = false, onLight: Boolean = false) {
+private fun MiniWeek(data: AppData, now: LocalDateTime, animateToday: Boolean, letters: Boolean = false) {
     val zone = ZoneId.systemDefault()
     val pop = remember { Animatable(if (animateToday) 0f else 1f) }
     LaunchedEffect(Unit) {
@@ -353,11 +349,7 @@ private fun MiniWeek(data: AppData, now: LocalDateTime, animateToday: Boolean, l
             val c = Insights.cell(data, date, now, zone)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 val m = if (back == 0) Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value } else Modifier
-                // On the bright sunrise, a day off is a soft shadow, not a dark hole.
                 val sq = when {
-                    onLight && c == Insights.Cell.Off -> m.size(22.dp).background(Palette.Ink.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
-                    // On the bright sky, a thin dark edge keeps the light squares visible.
-                    onLight -> m.size(22.dp).cellSquare(c, 6.dp).border(if (back == 0) 2.dp else 1.dp, Palette.Ink.copy(alpha = if (back == 0) 0.7f else 0.25f), RoundedCornerShape(6.dp))
                     else -> m.size(22.dp).cellSquare(c, 6.dp, selected = back == 0 && Insights.isGood(c))
                 }
                 Box(
@@ -388,7 +380,7 @@ private fun StepTrail(data: AppData, date: java.time.LocalDate) {
             val at = done[step.id]
             val shape = RoundedCornerShape(14.dp)
             val bg by animateColorAsState(
-                if (at != null) Palette.Sun.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.08f), tween(400), label = "chip",
+                if (at != null) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh, tween(400), label = "chip",
             )
             val label = if (at != null) {
                 "✓ ${step.title} " + Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
@@ -397,13 +389,13 @@ private fun StepTrail(data: AppData, date: java.time.LocalDate) {
                 label,
                 style = MaterialTheme.typography.labelMedium,
                 color = when {
-                    at != null -> Color(0xFFFFD9A6)
+                    at != null -> MaterialTheme.colorScheme.onSecondaryContainer
                     step.id == current -> MaterialTheme.colorScheme.onBackground
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 modifier = Modifier
                     .background(bg, shape)
-                    .then(if (step.id == current) Modifier.border(1.5.dp, Palette.Sun, shape) else Modifier)
+                    .then(if (step.id == current) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
                     .padding(horizontal = 10.dp, vertical = 6.dp),
             )
         }

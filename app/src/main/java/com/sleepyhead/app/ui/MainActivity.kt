@@ -3,7 +3,6 @@ package com.sleepyhead.app.ui
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -49,11 +48,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // The app is always dark, so the system bars always use light icons.
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-        )
+        enableEdgeToEdge()
         blockedFrom.value = intent?.getStringExtra(EXTRA_BLOCKED_PACKAGE)
         applyDefaultBlockedApps(store)
         if (savedInstanceState == null) NfcHub.handleIntent(this, store, intent)
@@ -124,32 +119,22 @@ fun App(store: Store, blockedFrom: String?, onBlockedSeen: () -> Unit) {
         .widthIn(max = 600.dp)
         .fillMaxWidth()
 
-    // The sky behind Home: night outside the lock, lighter with each step, full sunrise when done.
-    var skyNow by remember { mutableStateOf(LocalDateTime.now()) }
-    LaunchedEffect(Unit) { while (true) { delay(15_000); skyNow = LocalDateTime.now() } }
-    val onHome = screen == Screen.Home && data.settings.onboarded
-    val level = if (onHome) skyLevel(data, skyNow) else 0f
-    Box(Modifier.fillMaxSize()) {
-        if (onHome) SkyBackground(level)
-        SunriseInk(on = onHome && level >= 2f) {
-            Column(frame) {
-                nfcEvent?.let { e ->
-                    Notice(nfcMessage(e), Modifier.padding(horizontal = 16.dp)) { NfcHub.clearEvent() }
-                }
-                val m = Modifier.fillMaxWidth().weight(1f)
-                if (!data.settings.onboarded) {
-                    OnboardingScreen(store, data, m)
-                    return@Column
-                }
-                when (screen) {
-                    Screen.Home -> HomeScreen(store, data, blockedFrom, onBlockedSeen, go, m)
-                    Screen.Settings -> SettingsScreen(store, data, go, m)
-                    Screen.Apps -> AppsScreen(store, data, { screen = Screen.Settings }, m)
-                    Screen.Steps -> StepsScreen(store, data, { screen = Screen.Settings }, m)
-                    Screen.Codes -> CodesScreen(data, { screen = Screen.Home }, m)
-                    Screen.History -> HistoryScreen(data, { screen = Screen.Home }, m)
-                }
-            }
+    Column(frame) {
+        nfcEvent?.let { e ->
+            Notice(nfcMessage(e), Modifier.padding(horizontal = 16.dp)) { NfcHub.clearEvent() }
+        }
+        val m = Modifier.fillMaxWidth().weight(1f)
+        if (!data.settings.onboarded) {
+            OnboardingScreen(store, data, m)
+            return@Column
+        }
+        when (screen) {
+            Screen.Home -> HomeScreen(store, data, blockedFrom, onBlockedSeen, go, m)
+            Screen.Settings -> SettingsScreen(store, data, go, m)
+            Screen.Apps -> AppsScreen(store, data, { screen = Screen.Settings }, m)
+            Screen.Steps -> StepsScreen(store, data, { screen = Screen.Settings }, m)
+            Screen.Codes -> CodesScreen(data, { screen = Screen.Home }, m)
+            Screen.History -> HistoryScreen(data, { screen = Screen.Home }, m)
         }
     }
 }
@@ -178,18 +163,14 @@ fun nfcMessage(e: NfcEvent): String = when (e) {
 
 @Composable
 fun SleepyheadTheme(content: @Composable () -> Unit) {
-    val colors = darkColorScheme(
-        primary = Color(0xFFF2B66D),
-        onPrimary = Color(0xFF2A1B05),
-        secondary = Color(0xFF8FA3C7),
-        background = Color(0xFF12161F),
-        onBackground = Color(0xFFE8ECF4),
-        surface = Color(0xFF12161F),
-        onSurface = Color(0xFFE8ECF4),
-        surfaceVariant = Color(0xFF1E2430),
-        onSurfaceVariant = Color(0xFFB4BCCB),
-        surfaceContainer = Color(0xFF1A1F2A),
-        surfaceContainerHigh = Color(0xFF222836),
-    )
+    // Material You: on Android 12 and newer, colours come from your wallpaper.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    val colors = when {
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S ->
+            if (dark) androidx.compose.material3.dynamicDarkColorScheme(context) else androidx.compose.material3.dynamicLightColorScheme(context)
+        dark -> darkColorScheme()
+        else -> androidx.compose.material3.lightColorScheme()
+    }
     MaterialTheme(colorScheme = colors, content = content)
 }

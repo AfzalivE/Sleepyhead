@@ -110,7 +110,6 @@ private fun Page(modifier: Modifier, title: String, scroll: Boolean, brand: Bool
         if (brand) {
             // The first page says clearly what this app is.
             Column(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                SunMark(Modifier.size(120.dp))
                 Text("Sleepyhead", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
             }
         }

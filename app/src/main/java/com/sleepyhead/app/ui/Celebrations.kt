@@ -141,8 +141,8 @@ private class Piece(
 @Composable
 fun Confetti(key: Any, modifier: Modifier = Modifier.fillMaxSize(), count: Int = 70) {
     val colors = listOf(
-        MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary,
-        Color(0xFFE8ECF4), Color(0xFF9AD0A8), Color(0xFFE59AA8),
+        MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.tertiary,
+        MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.tertiaryContainer,
     )
     val pieces = remember(key) {
         val r = Random(key.hashCode())

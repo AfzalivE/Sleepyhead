@@ -155,20 +155,21 @@ private fun StreakHero(data: AppData, today: LocalDate) {
     val fill = if (next > prev) (streak - prev).toFloat() / (next - prev) else 0f
     Row(
         Modifier.fillMaxWidth()
-            .background(Brush.linearGradient(listOf(Color(0xFF2A2335), MaterialTheme.colorScheme.surfaceContainer)), RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(24.dp))
             .padding(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(96.dp), contentAlignment = Alignment.Center) {
-            val track = MaterialTheme.colorScheme.surfaceContainerHigh
+            val track = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)
+            val ringColor = MaterialTheme.colorScheme.primary
             Canvas(Modifier.size(96.dp)) {
                 val w = 7.dp.toPx()
                 val s = Size(size.width - w, size.height - w)
                 val o = Offset(w / 2, w / 2)
                 drawArc(track, 0f, 360f, false, o, s, style = Stroke(w))
-                drawArc(Palette.Sun, -90f, 360f * fill, false, o, s, style = Stroke(w, cap = StrokeCap.Round))
+                drawArc(ringColor, -90f, 360f * fill, false, o, s, style = Stroke(w, cap = StrokeCap.Round))
             }
-            Text("$streak", fontSize = 36.sp, fontWeight = FontWeight.Light)
+            Text("$streak", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
         Spacer(Modifier.width(18.dp))
         Column {
@@ -179,6 +180,7 @@ private fun StreakHero(data: AppData, today: LocalDate) {
                     else -> "$streak good mornings in a row"
                 },
                 style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             val togo = next - streak
             val line = buildString {
@@ -191,7 +193,7 @@ private fun StreakHero(data: AppData, today: LocalDate) {
                     }
                 }
             }
-            Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+            Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f), modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -212,7 +214,7 @@ private fun StatsRow(data: AppData, now: LocalDateTime, zone: ZoneId) {
 @Composable
 private fun StatCard(value: String, label: String, modifier: Modifier) {
     Column(modifier.background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(16.dp)).padding(12.dp)) {
-        Text(value, fontSize = 20.sp, color = Palette.Sun, maxLines = 1)
+        Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -319,7 +321,7 @@ private fun YearGrid(data: AppData, year: Int, now: LocalDateTime, zone: ZoneId,
                     } else {
                         val d = ym.atDay(day)
                         if (d.isAfter(today)) {
-                            Box(mod.background(Color(0xFF161A23), RoundedCornerShape(3.dp)))
+                            Box(mod.background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(3.dp)))
                         } else {
                             val c = Insights.cell(data, d, now, zone)
                             Box(
@@ -371,12 +373,7 @@ private fun MonthGrid(data: AppData, month: YearMonth, now: LocalDateTime, zone:
                         Text(
                             "${d.dayOfMonth}",
                             style = MaterialTheme.typography.labelMedium,
-                            color = when {
-                                Insights.isGood(c) -> Palette.Ink
-                                c == Insights.Cell.Away || c == Insights.Cell.LockOff || c == Insights.Cell.AfterEnd || c == Insights.Cell.Skipped -> Color.White
-                                c == Insights.Cell.Pending -> Color(0xFF5A6275)
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            },
+                            color = onCellColor(c),
                             fontWeight = if (Insights.isGood(c)) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     }
@@ -413,7 +410,7 @@ private fun DayDetail(data: AppData, d: LocalDate, now: LocalDateTime, zone: Zon
             .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        Text(d.format(dayFmt), color = Palette.Sun, fontWeight = FontWeight.SemiBold)
+        Text(d.format(dayFmt), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleSmall)
         Text(
             if (t != null) "Desk at ${t.format(shortTime)}" + (mins?.let { " · $it min" } ?: "") +
                 (if (c == Insights.Cell.AfterEnd || c == Insights.Cell.LockOff) " · ${cellLabel(c)}" else "")
@@ -435,6 +432,7 @@ private fun TimeToDesk(data: AppData, today: LocalDate, zone: ZoneId) {
         }
         val values = series.map { it.second }
         val start = today.minusDays(29)
+        val lineColor = MaterialTheme.colorScheme.primary
         Canvas(Modifier.fillMaxWidth().height(56.dp)) {
             val lo = values.min().toFloat()
             val hi = values.max().toFloat().coerceAtLeast(lo + 1f)
@@ -444,7 +442,7 @@ private fun TimeToDesk(data: AppData, today: LocalDate, zone: ZoneId) {
                 val y = size.height * (1f - (v - lo) / (hi - lo)) * 0.9f + size.height * 0.05f
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
-            drawPath(path, Palette.Sun, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(path, lineColor, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
         val tr = Insights.trend(values)
         Text(

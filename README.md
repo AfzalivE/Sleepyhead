@@ -1,6 +1,4 @@
-<p align="center"><img src="docs/icon.svg" width="96" alt="Sleepyhead icon: a sun rising over the horizon"></p>
-
-<h1 align="center">Sleepyhead</h1>
+# Sleepyhead
 
 Sleepyhead is an Android app that helps you get out of bed and to your desk in the morning,
 instead of reading news, social media and work chat in bed.
