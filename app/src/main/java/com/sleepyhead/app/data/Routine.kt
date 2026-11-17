@@ -72,6 +72,7 @@ object Routine {
             log?.skipped == true -> DayStatus.Skipped
             isTravelDay(data, date) -> DayStatus.Away
             !isRoutineDay(data.settings, date) -> DayStatus.DayOff
+            data.settings.startedOn?.let { date.isBefore(LocalDate.parse(it)) } == true -> DayStatus.DayOff
             date.isAfter(now.toLocalDate()) -> DayStatus.Pending
             date == now.toLocalDate() && minutesOfDay(now) < data.settings.lockEndMinutes -> DayStatus.Pending
             else -> DayStatus.Missed

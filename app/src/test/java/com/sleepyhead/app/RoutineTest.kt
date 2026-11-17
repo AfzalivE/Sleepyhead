@@ -107,6 +107,13 @@ class RoutineTest {
         assertEquals(Routine.TestResult.Unknown, Routine.testStep(base, "a", null))
     }
 
+    @Test fun daysBeforeStartAreNotMissed() {
+        val d = base.copy(settings = settings.copy(startedOn = "2026-11-16"))
+        val now = at(12, 0, LocalDate.of(2026, 11, 17))
+        assertEquals(Routine.DayStatus.DayOff, Routine.dayStatus(d, LocalDate.of(2026, 11, 13), now))
+        assertEquals(Routine.DayStatus.Missed, Routine.dayStatus(d, LocalDate.of(2026, 11, 16), now))
+    }
+
     @Test fun unknownCode() {
         assertEquals(Routine.ProofResult.Unknown, Routine.applyScan(base, "hello", at(7, 0)).second)
     }

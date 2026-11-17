@@ -25,7 +25,11 @@ class Store(context: Context) {
     private fun load(): AppData {
         val raw = prefs.getString(KEY, null)
         val loaded = raw?.let { runCatching { json.decodeFromString<AppData>(it) }.getOrNull() }
-        return loaded ?: AppData(steps = defaultSteps()).also { save(it) }
+        val data = loaded ?: AppData(steps = defaultSteps())
+        if (data.settings.startedOn != null) return data
+        // First run, or data from before this field: start at the earliest log, else today.
+        val start = data.logs.keys.minOrNull() ?: LocalDate.now().toString()
+        return data.copy(settings = data.settings.copy(startedOn = start)).also { save(it) }
     }
 
     private fun save(d: AppData) {

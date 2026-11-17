@@ -37,6 +37,8 @@ data class Settings(
     val autoTravel: Boolean = false,
     val home: HomeLocation? = null,
     val homeRadiusMeters: Int = 2000,
+    /** ISO date of the first day Sleepyhead was used. Earlier days never count as missed. */
+    val startedOn: String? = null,
 )
 
 @Serializable

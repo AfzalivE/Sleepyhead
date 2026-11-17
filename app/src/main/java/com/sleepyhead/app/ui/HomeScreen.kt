@@ -353,6 +353,12 @@ private fun RestView(data: AppData, now: LocalDateTime, streak: Int, onTestNow: 
     }
     Spacer(Modifier.height(20.dp))
     WeekStrip(data, now)
+    Text(
+        "✓ done   ✈ away   – skipped   ✗ missed",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 6.dp),
+    )
     val untested = data.steps.count { it.testedAtMillis == null }
     if (untested > 0) {
         Spacer(Modifier.height(12.dp))
