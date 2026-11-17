@@ -150,22 +150,13 @@ fun HomeScreen(
         // Top bar. Small and quiet on purpose. Always light: it sits on the dark top of the sky.
         CompositionLocalProvider(LocalContentColor provides TopInk) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // The app name, with the streak in small text under it.
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Sleepyhead",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFE8ECF4),
-                )
-                if (streak > 0) {
-                    Text(
-                        "$streak-morning streak",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TopInk,
-                    )
-                }
-            }
+            Text(
+                "Sleepyhead",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFFE8ECF4),
+                modifier = Modifier.weight(1f),
+            )
             IconButton(onClick = { go(Screen.History) }) { Icon(Icons.Outlined.CalendarMonth, "History") }
             IconButton(onClick = { go(Screen.Codes) }) { Icon(Icons.Outlined.QrCode2, "QR codes") }
             IconButton(onClick = { go(Screen.Settings) }) { Icon(Icons.Outlined.Settings, "Settings") }
