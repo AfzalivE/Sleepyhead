@@ -30,6 +30,7 @@ class LockService : AccessibilityService() {
     private val guard by lazy { SettingsGuard(this) }
     private val handler = Handler(Looper.getMainLooper())
     private var recheckPending = false
+    private var blockedUntil = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -89,14 +90,16 @@ class LockService : AccessibilityService() {
 
     private fun guardCheck(pkg: String) {
         lastGuardCheck = SystemClock.elapsedRealtime()
+        if (lastGuardCheck < blockedUntil) return
         val store = (application as SleepyheadApp).store
         if (!store.isLockActive()) return
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString() != pkg) return
         if (guard.shouldBlock(pkg, root)) {
-            // Back (not Home): after Home, Android delays activity starts for a few seconds,
-            // so Sleepyhead would not open. Back closes the page or dialog, then Sleepyhead opens on top.
-            performGlobalAction(GLOBAL_ACTION_BACK)
+            // Only bring Sleepyhead to the front. No Home press: after Home, Android delays activity
+            // starts for a few seconds. No Back press: one page sends several events, and extra Back
+            // presses would close Sleepyhead itself. Then ignore the guard for a short time.
+            blockedUntil = SystemClock.elapsedRealtime() + 1500
             sendBack(MainActivity.BLOCKED_SETTINGS)
         }
     }
