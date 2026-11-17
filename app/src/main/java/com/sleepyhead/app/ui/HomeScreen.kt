@@ -150,13 +150,12 @@ fun HomeScreen(
         // Top bar. Small and quiet on purpose. Always light: it sits on the dark top of the sky.
         CompositionLocalProvider(LocalContentColor provides TopInk) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            // The Sleepyhead mark and wordmark, with the streak in small text under it.
-            SunMark(Modifier.size(40.dp))
+            // The app name, with the streak in small text under it.
             Column(Modifier.weight(1f)) {
                 Text(
                     "Sleepyhead",
-                    fontFamily = Palette.Serif,
-                    fontSize = 22.sp,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color(0xFFE8ECF4),
                 )
                 if (streak > 0) {
@@ -321,7 +320,7 @@ private fun DoneView(
     )
     if (streak > 0) {
         Spacer(Modifier.height(20.dp))
-        if (animate) CountUp(streak) else Text("$streak", fontSize = 56.sp, fontFamily = Palette.Serif)
+        if (animate) CountUp(streak) else Text("$streak", fontSize = 56.sp, fontWeight = FontWeight.Light)
         Small(if (streak == 1) "good morning in a row" else "good mornings in a row")
         val line = Encouragement.streakLine(streak, best)
         if (line.isNotEmpty()) {
@@ -527,7 +526,6 @@ fun Notice(text: String, modifier: Modifier = Modifier, onDismiss: () -> Unit) {
 private fun Big(text: String) = Text(
     text,
     style = MaterialTheme.typography.headlineLarge,
-    fontFamily = Palette.Serif,
     textAlign = TextAlign.Center,
     color = MaterialTheme.colorScheme.onBackground,
 )

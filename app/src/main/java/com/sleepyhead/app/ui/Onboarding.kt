@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -110,7 +111,7 @@ private fun Page(modifier: Modifier, title: String, scroll: Boolean, brand: Bool
             // The first page says clearly what this app is.
             Column(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 SunMark(Modifier.size(120.dp))
-                Text("Sleepyhead", fontFamily = Palette.Serif, fontSize = 40.sp, color = MaterialTheme.colorScheme.onBackground)
+                Text("Sleepyhead", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
             }
         }
         Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 12.dp))
