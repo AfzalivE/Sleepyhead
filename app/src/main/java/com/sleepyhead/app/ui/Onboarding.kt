@@ -29,6 +29,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,7 +54,7 @@ fun OnboardingScreen(store: Store, data: AppData, modifier: Modifier) {
         )
         val body = Modifier.weight(1f).fillMaxWidth()
         when (page) {
-            0 -> Page(body, "Good morning, Sleepyhead", scroll = true) {
+            0 -> Page(body, "Good morning", scroll = true, brand = true) {
                 Para("When you wake up, your phone pulls you into news, social media and work chat.")
                 Para("Sleepyhead blocks those apps in the morning until you get up and finish your routine: " +
                     "for example brush your teeth, eat breakfast, and sit down at your desk.")
@@ -102,9 +104,15 @@ fun OnboardingScreen(store: Store, data: AppData, modifier: Modifier) {
 }
 
 @Composable
-private fun Page(modifier: Modifier, title: String, scroll: Boolean, content: @Composable ColumnScope.() -> Unit) {
+private fun Page(modifier: Modifier, title: String, scroll: Boolean, brand: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     val m = if (scroll) modifier.verticalScroll(rememberScrollState()) else modifier
     Column(m) {
+        if (brand) {
+            // The first page says clearly what this app is.
+            Column(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Sleepyhead", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+            }
+        }
         Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(vertical = 12.dp))
         content()
     }

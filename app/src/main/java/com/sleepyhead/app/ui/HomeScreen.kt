@@ -151,9 +151,10 @@ fun HomeScreen(
         CompositionLocalProvider(LocalContentColor provides TopInk) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (streak > 0) "$streak-morning streak" else "Sleepyhead",
-                style = MaterialTheme.typography.titleSmall,
-                color = TopInk,
+                "Sleepyhead",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFFE8ECF4),
                 modifier = Modifier.weight(1f),
             )
             IconButton(onClick = { go(Screen.History) }) { Icon(Icons.Outlined.CalendarMonth, "History") }
@@ -310,7 +311,7 @@ private fun DoneView(
     )
     if (streak > 0) {
         Spacer(Modifier.height(20.dp))
-        if (animate) CountUp(streak) else Text("$streak", fontSize = 56.sp, fontFamily = Palette.Serif)
+        if (animate) CountUp(streak) else Text("$streak", fontSize = 56.sp, fontWeight = FontWeight.Light)
         Small(if (streak == 1) "good morning in a row" else "good mornings in a row")
         val line = Encouragement.streakLine(streak, best)
         if (line.isNotEmpty()) {
@@ -516,7 +517,6 @@ fun Notice(text: String, modifier: Modifier = Modifier, onDismiss: () -> Unit) {
 private fun Big(text: String) = Text(
     text,
     style = MaterialTheme.typography.headlineLarge,
-    fontFamily = Palette.Serif,
     textAlign = TextAlign.Center,
     color = MaterialTheme.colorScheme.onBackground,
 )

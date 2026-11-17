@@ -141,7 +141,7 @@ private fun Segmented(tab: HistoryTab, onSelect: (HistoryTab) -> Unit) {
 private fun Stepper(title: String, canNext: Boolean, onPrev: () -> Unit, onNext: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onPrev) { Text("‹", fontSize = 24.sp) }
-        Text(title, fontFamily = Palette.Serif, fontSize = 24.sp)
+        Text(title, style = MaterialTheme.typography.titleLarge)
         TextButton(onClick = onNext, enabled = canNext) { Text("›", fontSize = 24.sp) }
     }
 }
@@ -168,7 +168,7 @@ private fun StreakHero(data: AppData, today: LocalDate) {
                 drawArc(track, 0f, 360f, false, o, s, style = Stroke(w))
                 drawArc(Palette.Sun, -90f, 360f * fill, false, o, s, style = Stroke(w, cap = StrokeCap.Round))
             }
-            Text("$streak", fontFamily = Palette.Serif, fontSize = 38.sp)
+            Text("$streak", fontSize = 36.sp, fontWeight = FontWeight.Light)
         }
         Spacer(Modifier.width(18.dp))
         Column {
