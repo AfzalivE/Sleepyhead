@@ -235,7 +235,12 @@ private fun TimeRow(label: String, minutes: Int, enabled: Boolean, onClick: () -
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Text(minutesToText(minutes), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+        Text(
+            minutesToText(minutes),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(end = 12.dp),
+        )
     }
 }
 
