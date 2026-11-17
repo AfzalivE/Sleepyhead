@@ -54,19 +54,20 @@ object Encouragement {
         }
     }
 
-    /** The big line on the done screen. Milestones get their own words. */
-    fun doneHeadline(streak: Int): String = when {
-        streak >= 100 -> "100 mornings. Legendary."
-        streak >= 50 -> "50 mornings in a row. Unstoppable."
-        streak >= 30 -> "A whole month of good mornings!"
-        streak >= 21 -> "Three weeks strong. This is a habit now."
-        streak >= 14 -> "Two weeks in a row. Amazing."
-        streak >= 10 -> "Ten in a row. You're on fire."
-        streak >= 7 -> "A full week of good mornings!"
-        streak >= 5 -> "Five in a row. Keep it going."
-        streak >= 3 -> "Three in a row. It's sticking."
-        streak == 2 -> "Two in a row. Nice."
-        else -> "You're at your desk."
+    /** The big line on the done screen. Only the exact milestone day gets its own words. */
+    fun doneHeadline(streak: Int): String = when (streak) {
+        100 -> "100 mornings. Legendary."
+        50 -> "50 mornings in a row. Unstoppable."
+        30 -> "A whole month of good mornings!"
+        21 -> "Three weeks strong. This is a habit now."
+        14 -> "Two weeks in a row. Amazing."
+        10 -> "Ten in a row. You're on fire."
+        7 -> "A full week of good mornings!"
+        5 -> "Five in a row. Keep it going."
+        3 -> "Three in a row. It's sticking."
+        2 -> "Two in a row. Nice."
+        0, 1 -> "You're at your desk."
+        else -> if (streak > 100 && streak % 50 == 0) "$streak mornings in a row. Incredible." else "$streak in a row. Good morning!"
     }
 
     fun isMilestone(streak: Int) = streak in setOf(3, 5, 7, 10, 14, 21, 30, 50, 100) || (streak > 100 && streak % 50 == 0)

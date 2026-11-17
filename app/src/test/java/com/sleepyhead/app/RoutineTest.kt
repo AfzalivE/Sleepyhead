@@ -140,4 +140,38 @@ class RoutineTest {
         assertFalse(Routine.isLockActive(d, at(7, 0)))
         assertEquals(0, Routine.streak(d, LocalDate.of(2026, 11, 16)))
     }
+
+    private fun ms(t: LocalDateTime) = t.toInstant(ZoneOffset.UTC).toEpochMilli()
+
+    @Test fun gapInLockMarksMorningAndBreaksStreak() {
+        fun ok(date: String) = date to DayLog(date = date, completedAtMillis = 1, onTime = true)
+        val monday = "2026-11-16" to DayLog("2026-11-16", completedAtMillis = ms(at(9, 0)), onTime = true)
+        val d = base.copy(logs = mapOf(ok("2026-11-13"), monday))
+        assertEquals(2, Routine.streak(d, LocalDate.of(2026, 11, 16)))
+        // Service off from 7:00 to 8:00 on Monday, inside the window.
+        val marked = Routine.markLockOff(d, ms(at(7, 0)), ms(at(8, 0)), ZoneOffset.UTC)
+        assertTrue(marked.logs["2026-11-16"]!!.lockOff)
+        assertEquals(0, Routine.streak(marked, LocalDate.of(2026, 11, 16)))
+        assertEquals(Routine.DayStatus.LockOff, Routine.dayStatus(marked, LocalDate.of(2026, 11, 16), at(12, 0)))
+    }
+
+    @Test fun gapOutsideWindowOrAfterFinishIsIgnored() {
+        // Overnight gap, Monday 20:00 to Tuesday 6:00: no window touched.
+        assertEquals(base, Routine.markLockOff(base, ms(at(20, 0)), ms(at(6, 0, LocalDate.of(2026, 11, 17))), ZoneOffset.UTC))
+        // Weekend gap: Saturday is not a routine day.
+        val sat = LocalDate.of(2026, 11, 14)
+        assertEquals(base, Routine.markLockOff(base, ms(at(7, 0, sat)), ms(at(9, 0, sat)), ZoneOffset.UTC))
+        // Finished at 7:00, gap starts at 7:30: the morning still counts.
+        val done = base.copy(logs = mapOf("2026-11-16" to DayLog("2026-11-16", completedAtMillis = ms(at(7, 0)), onTime = true)))
+        val after = Routine.markLockOff(done, ms(at(7, 30)), ms(at(9, 0)), ZoneOffset.UTC)
+        assertFalse(after.logs["2026-11-16"]!!.lockOff)
+        assertEquals(1, Routine.streak(after, LocalDate.of(2026, 11, 16)))
+    }
+
+    @Test fun multiDayGapMarksEachMorning() {
+        val marked = Routine.markLockOff(base, ms(at(12, 0)), ms(at(7, 0, LocalDate.of(2026, 11, 18))), ZoneOffset.UTC)
+        assertFalse(marked.logs.containsKey("2026-11-16")) // gap began after Monday's window
+        assertTrue(marked.logs["2026-11-17"]!!.lockOff)
+        assertTrue(marked.logs["2026-11-18"]!!.lockOff)
+    }
 }

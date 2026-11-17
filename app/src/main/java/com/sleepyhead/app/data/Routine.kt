@@ -62,15 +62,16 @@ object Routine {
         return null
     }
 
-    enum class DayStatus { OnTime, Late, Skipped, Away, Missed, Pending, DayOff }
+    enum class DayStatus { OnTime, Late, Skipped, Away, LockOff, Missed, Pending, DayOff }
 
     /** A one-word summary of a day, for the 7-day strip. */
     fun dayStatus(data: AppData, date: LocalDate, now: LocalDateTime): DayStatus {
         val log = data.logs[date.toString()]
         return when {
-            log?.completedAtMillis != null -> if (log.onTime) DayStatus.OnTime else DayStatus.Late
             log?.skipped == true -> DayStatus.Skipped
             isTravelDay(data, date) -> DayStatus.Away
+            log?.lockOff == true -> DayStatus.LockOff
+            log?.completedAtMillis != null -> if (log.onTime) DayStatus.OnTime else DayStatus.Late
             !isRoutineDay(data.settings, date) -> DayStatus.DayOff
             data.settings.startedOn?.let { date.isBefore(LocalDate.parse(it)) } == true -> DayStatus.DayOff
             date.isAfter(now.toLocalDate()) -> DayStatus.Pending
@@ -166,11 +167,11 @@ object Routine {
     fun applyTag(data: AppData, tagId: String?, tagCode: String?, now: LocalDateTime, zone: ZoneId = ZoneId.systemDefault()) =
         applyProof(data, stepForTag(data, tagId) ?: stepForCode(data, tagCode), now, zone)
 
-    private fun countsForStreak(data: AppData, day: LocalDate): Boolean? {
+    internal fun countsForStreak(data: AppData, day: LocalDate): Boolean? {
         val log = data.logs[day.toString()]
         if (log?.away == true && data.settings.autoTravel) return null // travel day: ignored
         if (!isRoutineDay(data.settings, day)) return null
-        return log != null && log.onTime && !log.skipped
+        return log != null && log.onTime && !log.skipped && !log.lockOff
     }
 
     /**
@@ -211,4 +212,37 @@ object Routine {
         }
         return best
     }
+
+    /**
+     * Marks each morning that a gap in the lock service overlaps as "lock was off".
+     * A morning is not marked when it is not a routine day, when it was a travel day or skipped,
+     * or when the routine was already finished before the gap reached the lock window.
+     */
+    fun markLockOff(data: AppData, startMillis: Long, endMillis: Long, zone: ZoneId): AppData {
+        if (endMillis <= startMillis) return data
+        val s = settingsWindowSafe(data.settings) ?: return data
+        var logs = data.logs
+        var day = java.time.Instant.ofEpochMilli(startMillis).atZone(zone).toLocalDate()
+        val last = java.time.Instant.ofEpochMilli(endMillis).atZone(zone).toLocalDate()
+        while (!day.isAfter(last)) {
+            if (isRoutineDay(data.settings, day)) {
+                val winStart = day.atStartOfDay(zone).plusMinutes(s.first.toLong()).toInstant().toEpochMilli()
+                val winEnd = day.atStartOfDay(zone).plusMinutes(s.second.toLong()).toInstant().toEpochMilli()
+                val overlapStart = maxOf(startMillis, winStart)
+                val overlapEnd = minOf(endMillis, winEnd)
+                if (overlapStart < overlapEnd) {
+                    val key = day.toString()
+                    val log = logs[key] ?: DayLog(key)
+                    val finishedBefore = log.completedAtMillis?.let { it <= overlapStart } == true
+                    val travel = data.settings.autoTravel && log.away == true
+                    if (!finishedBefore && !log.skipped && !travel) logs = logs + (key to log.copy(lockOff = true))
+                }
+            }
+            day = day.plusDays(1)
+        }
+        return data.copy(logs = logs)
+    }
+
+    private fun settingsWindowSafe(s: Settings): Pair<Int, Int>? =
+        if (s.wakeMinutes < s.lockEndMinutes) s.wakeMinutes to s.lockEndMinutes else null
 }

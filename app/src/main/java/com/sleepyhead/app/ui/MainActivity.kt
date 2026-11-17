@@ -3,9 +3,11 @@ package com.sleepyhead.app.ui
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -30,9 +33,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sleepyhead.app.SleepyheadApp
 import com.sleepyhead.app.data.Routine
 import com.sleepyhead.app.data.Store
+import com.sleepyhead.app.lock.LockHealth
+import com.sleepyhead.app.lock.LockService
 import com.sleepyhead.app.nfc.NfcEvent
 import com.sleepyhead.app.nfc.NfcHub
 import com.sleepyhead.app.travel.TravelCheck
+import kotlinx.coroutines.delay
+import java.time.LocalDateTime
 
 class MainActivity : ComponentActivity() {
 
@@ -42,7 +49,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The app is always dark, so the system bars always use light icons.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         blockedFrom.value = intent?.getStringExtra(EXTRA_BLOCKED_PACKAGE)
         applyDefaultBlockedApps(store)
         if (savedInstanceState == null) NfcHub.handleIntent(this, store, intent)
@@ -59,6 +70,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         NfcHub.enableReader(this, store)
         TravelCheck.runIfNeeded(this, store)
+        // If the lock service is not running now, the time since it was last seen is a gap.
+        if (!LockService.running || !LockService.isEnabled(this)) LockHealth.recordGap(this, store)
     }
 
     override fun onPause() {
@@ -83,6 +96,8 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_BLOCKED_PACKAGE = "blocked_package"
+        /** Sent as the blocked package when the lock sends you back from Sleepyhead's own settings pages. */
+        const val BLOCKED_SETTINGS = "sleepyhead.settings"
     }
 }
 
@@ -109,22 +124,32 @@ fun App(store: Store, blockedFrom: String?, onBlockedSeen: () -> Unit) {
         .widthIn(max = 600.dp)
         .fillMaxWidth()
 
-    Column(frame) {
-        nfcEvent?.let { e ->
-            Notice(nfcMessage(e), Modifier.padding(horizontal = 16.dp)) { NfcHub.clearEvent() }
-        }
-        val m = Modifier.fillMaxWidth().weight(1f)
-        if (!data.settings.onboarded) {
-            OnboardingScreen(store, data, m)
-            return@Column
-        }
-        when (screen) {
-            Screen.Home -> HomeScreen(store, data, blockedFrom, onBlockedSeen, go, m)
-            Screen.Settings -> SettingsScreen(store, data, go, m)
-            Screen.Apps -> AppsScreen(store, data, { screen = Screen.Settings }, m)
-            Screen.Steps -> StepsScreen(store, data, { screen = Screen.Settings }, m)
-            Screen.Codes -> CodesScreen(data, { screen = Screen.Home }, m)
-            Screen.History -> HistoryScreen(data, { screen = Screen.Home }, m)
+    // The sky behind Home: night outside the lock, lighter with each step, full sunrise when done.
+    var skyNow by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(Unit) { while (true) { delay(15_000); skyNow = LocalDateTime.now() } }
+    val onHome = screen == Screen.Home && data.settings.onboarded
+    val level = if (onHome) skyLevel(data, skyNow) else 0f
+    Box(Modifier.fillMaxSize()) {
+        if (onHome) SkyBackground(level)
+        SunriseInk(on = onHome && level >= 2f) {
+            Column(frame) {
+                nfcEvent?.let { e ->
+                    Notice(nfcMessage(e), Modifier.padding(horizontal = 16.dp)) { NfcHub.clearEvent() }
+                }
+                val m = Modifier.fillMaxWidth().weight(1f)
+                if (!data.settings.onboarded) {
+                    OnboardingScreen(store, data, m)
+                    return@Column
+                }
+                when (screen) {
+                    Screen.Home -> HomeScreen(store, data, blockedFrom, onBlockedSeen, go, m)
+                    Screen.Settings -> SettingsScreen(store, data, go, m)
+                    Screen.Apps -> AppsScreen(store, data, { screen = Screen.Settings }, m)
+                    Screen.Steps -> StepsScreen(store, data, { screen = Screen.Settings }, m)
+                    Screen.Codes -> CodesScreen(data, { screen = Screen.Home }, m)
+                    Screen.History -> HistoryScreen(data, { screen = Screen.Home }, m)
+                }
+            }
         }
     }
 }

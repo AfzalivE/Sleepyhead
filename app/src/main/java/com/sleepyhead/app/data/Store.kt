@@ -86,6 +86,10 @@ class Store(context: Context) {
     fun countBlockedAttempt(now: LocalDateTime = LocalDateTime.now()) =
         updateToday(now) { it.copy(blockedAttempts = it.blockedAttempts + 1) }
 
+    /** Records that the lock service was off from [startMillis] to [endMillis]. */
+    fun markLockOff(startMillis: Long, endMillis: Long) =
+        update { Routine.markLockOff(it, startMillis, endMillis, ZoneId.systemDefault()) }
+
     fun resetToday(now: LocalDateTime = LocalDateTime.now()) = update {
         it.copy(logs = it.logs - now.toLocalDate().toString())
     }
