@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
@@ -143,3 +144,15 @@ fun cellLabel(c: Insights.Cell): String = when (c) {
     Insights.Cell.Off -> "Day off"
     Insights.Cell.Pending -> "Not yet"
 }
+
+/** The app icon's sun over the horizon, for the wordmark and onboarding. */
+@Composable
+fun SunMark(modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Image(
+        androidx.compose.ui.res.painterResource(com.sleepyhead.app.R.drawable.ic_launcher_foreground),
+        contentDescription = null,
+        // The drawable has a wide safe area. Scale it up so the mark fills the box.
+        modifier = modifier.graphicsLayer { scaleX = 1.7f; scaleY = 1.7f },
+    )
+}
+
