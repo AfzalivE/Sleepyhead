@@ -15,8 +15,13 @@ instead of reading news, social media and work chat in bed.
 - **Calm start screen.** During the lock, the screen shows only the next step, a timer since lock start,
   and the time left until lock end. Outside the lock, it shows when your next morning starts,
   your streak and the last 7 days.
-- **Streaks and log.** A morning counts when you finish before lock end. You see your current streak,
-  your best streak, and a 30-day log. The log also counts how often you reached for a blocked app.
+- **The sky.** During the lock, the Home background moves from night to dawn with each step, and a sun rises.
+  A row of chips shows your steps and the time you did each one. When you finish, the sky is a full sunrise.
+- **Streaks and history.** A morning counts when you finish before lock end. History shows a streak ring
+  that fills toward the next milestone, your on-time rate, your usual desk time and your average time from
+  lock start to desk. A 16-week grid, a Year in pixels view and a Month view show one square per morning:
+  an earlier finish is brighter. Tap a square to see the day (desk time, minutes, blocked-app attempts).
+  A chart shows your time to desk for the last 30 days.
 - **Travel mode.** Save your home location once. At lock start, if your phone is away from home,
   the lock stays off for that day. Travel days do not break your streak. There is no manual
   "lock off" switch, so travel mode is not an easy way out.
@@ -109,6 +114,7 @@ Scan the codes in order. *Settings → Clear today's progress* resets today.
 | Path | What it holds |
 | --- | --- |
 | `data/Routine.kt` | Pure rules: lock window, step order, on-time, streaks (unit tested) |
+| `data/Insights.kt` | Pure numbers for History: square colours, stats, milestones, trend (unit tested) |
 | `data/Store.kt` | Saves settings, steps and the daily log as JSON |
 | `lock/LockService.kt` | Accessibility service that sends you back from blocked apps and guarded pages |
 | `lock/SettingsGuard.kt` | Finds Sleepyhead's App info, Storage, Accessibility and uninstall pages |
@@ -116,4 +122,5 @@ Scan the codes in order. *Settings → Clear today's progress* resets today.
 | `nfc/Nfc.kt` | NFC reader mode, tag pairing and writing, and tags that open the app |
 | `travel/TravelCheck.kt` | Home/away check at lock start, and the lock-start alarm |
 | `qr/QrCodes.kt` | QR generation and the print/PDF document |
+| `ui/Sky.kt`, `ui/History.kt` | The sky behind Home, the palette, and the History grids |
 | `ui/` | Jetpack Compose screens: onboarding, home, settings, blocked apps, steps, codes, history |

@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,6 +37,8 @@ import com.sleepyhead.app.lock.LockService
 import com.sleepyhead.app.nfc.NfcEvent
 import com.sleepyhead.app.nfc.NfcHub
 import com.sleepyhead.app.travel.TravelCheck
+import kotlinx.coroutines.delay
+import java.time.LocalDateTime
 
 class MainActivity : ComponentActivity() {
 
@@ -115,22 +119,32 @@ fun App(store: Store, blockedFrom: String?, onBlockedSeen: () -> Unit) {
         .widthIn(max = 600.dp)
         .fillMaxWidth()
 
-    Column(frame) {
-        nfcEvent?.let { e ->
-            Notice(nfcMessage(e), Modifier.padding(horizontal = 16.dp)) { NfcHub.clearEvent() }
-        }
-        val m = Modifier.fillMaxWidth().weight(1f)
-        if (!data.settings.onboarded) {
-            OnboardingScreen(store, data, m)
-            return@Column
-        }
-        when (screen) {
-            Screen.Home -> HomeScreen(store, data, blockedFrom, onBlockedSeen, go, m)
-            Screen.Settings -> SettingsScreen(store, data, go, m)
-            Screen.Apps -> AppsScreen(store, data, { screen = Screen.Settings }, m)
-            Screen.Steps -> StepsScreen(store, data, { screen = Screen.Settings }, m)
-            Screen.Codes -> CodesScreen(data, { screen = Screen.Home }, m)
-            Screen.History -> HistoryScreen(data, { screen = Screen.Home }, m)
+    // The sky behind Home: night outside the lock, lighter with each step, full sunrise when done.
+    var skyNow by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(Unit) { while (true) { delay(15_000); skyNow = LocalDateTime.now() } }
+    val onHome = screen == Screen.Home && data.settings.onboarded
+    val level = if (onHome) skyLevel(data, skyNow) else 0f
+    Box(Modifier.fillMaxSize()) {
+        if (onHome) SkyBackground(level)
+        SunriseInk(on = onHome && level >= 2f) {
+            Column(frame) {
+                nfcEvent?.let { e ->
+                    Notice(nfcMessage(e), Modifier.padding(horizontal = 16.dp)) { NfcHub.clearEvent() }
+                }
+                val m = Modifier.fillMaxWidth().weight(1f)
+                if (!data.settings.onboarded) {
+                    OnboardingScreen(store, data, m)
+                    return@Column
+                }
+                when (screen) {
+                    Screen.Home -> HomeScreen(store, data, blockedFrom, onBlockedSeen, go, m)
+                    Screen.Settings -> SettingsScreen(store, data, go, m)
+                    Screen.Apps -> AppsScreen(store, data, { screen = Screen.Settings }, m)
+                    Screen.Steps -> StepsScreen(store, data, { screen = Screen.Settings }, m)
+                    Screen.Codes -> CodesScreen(data, { screen = Screen.Home }, m)
+                    Screen.History -> HistoryScreen(data, { screen = Screen.Home }, m)
+                }
+            }
         }
     }
 }

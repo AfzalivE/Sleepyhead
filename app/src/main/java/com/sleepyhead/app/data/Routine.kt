@@ -167,7 +167,7 @@ object Routine {
     fun applyTag(data: AppData, tagId: String?, tagCode: String?, now: LocalDateTime, zone: ZoneId = ZoneId.systemDefault()) =
         applyProof(data, stepForTag(data, tagId) ?: stepForCode(data, tagCode), now, zone)
 
-    private fun countsForStreak(data: AppData, day: LocalDate): Boolean? {
+    internal fun countsForStreak(data: AppData, day: LocalDate): Boolean? {
         val log = data.logs[day.toString()]
         if (log?.away == true && data.settings.autoTravel) return null // travel day: ignored
         if (!isRoutineDay(data.settings, day)) return null

@@ -19,6 +19,13 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.sleepyhead.app.data.Insights
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -168,7 +175,7 @@ fun HomeScreen(
         val inWindow = Routine.inMorningWindow(data.settings, now)
         when {
             !inWindow -> RestView(data, now, streak) { go(Screen.Steps) }
-            finishedAt != null -> DoneView(finishedAt, log.onTime, log.lockOff, streak, Routine.bestStreak(data), justFinished)
+            finishedAt != null -> DoneView(data, now, finishedAt, log.onTime, log.lockOff, streak, Routine.bestStreak(data), justFinished)
             travel -> {
                 Text("✈", fontSize = 56.sp, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(12.dp))
@@ -190,8 +197,8 @@ fun HomeScreen(
 
         Spacer(Modifier.weight(1f))
 
-        if (inWindow) {
-            StepDots(data, today)
+        if (inWindow && finishedAt == null && log?.skipped != true) {
+            StepTrail(data, today)
             Spacer(Modifier.height(16.dp))
         }
         if (lockActive) {
@@ -217,7 +224,13 @@ private fun NextStepView(
     val s = data.settings
     val nowMin = Routine.minutesOfDay(now)
     val inWindow = Routine.inMorningWindow(s, now)
-    Text("NEXT", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary, letterSpacing = 3.sp)
+    val doneCount = data.logs[now.toLocalDate().toString()]?.done?.size ?: 0
+    Text(
+        "STEP ${(doneCount + 1).coerceAtMost(data.steps.size)} OF ${data.steps.size}",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.secondary,
+        letterSpacing = 4.sp,
+    )
     Spacer(Modifier.height(8.dp))
     // The new step slides up into place when the last one is done.
     AnimatedContent(
@@ -239,11 +252,11 @@ private fun NextStepView(
         Text(
             formatDuration(secondsSinceWake),
             fontSize = 56.sp,
-            fontWeight = FontWeight.Light,
+            fontWeight = FontWeight.ExtraLight,
             color = MaterialTheme.colorScheme.onBackground,
         )
         val left = s.lockEndMinutes - nowMin
-        Small("since ${minutesToText(s.wakeMinutes)}. Lock ends at ${minutesToText(s.lockEndMinutes)} ($left min).")
+        Small("since ${minutesToText(s.wakeMinutes)} · lock ends ${minutesToText(s.lockEndMinutes)} ($left min)")
     } else if (Routine.isRoutineDay(s, now.toLocalDate()) && nowMin < s.wakeMinutes) {
         Small("Your morning starts at ${minutesToText(s.wakeMinutes)}. Sleep well.")
     } else {
@@ -258,7 +271,7 @@ private fun NextStepView(
     ) {
         Icon(Icons.Outlined.QrCodeScanner, null)
         Spacer(Modifier.size(12.dp))
-        Text("I'm here. Scan the code", fontSize = 18.sp)
+        Text(if (hasTag) "I'm here · Scan or tap" else "I'm here · Scan the code", fontSize = 18.sp)
     }
     if (hasTag) {
         Small("Or tap your phone on the NFC tag in $place.")
@@ -266,21 +279,32 @@ private fun NextStepView(
 }
 
 @Composable
-private fun DoneView(finishedAt: Long, onTime: Boolean, lockOff: Boolean, streak: Int, best: Int, animate: Boolean) {
-    val t = Instant.ofEpochMilli(finishedAt).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
-    RisingSun(animate = animate)
-    Spacer(Modifier.height(8.dp))
+private fun DoneView(
+    data: AppData,
+    now: LocalDateTime,
+    finishedAt: Long,
+    onTime: Boolean,
+    lockOff: Boolean,
+    streak: Int,
+    best: Int,
+    animate: Boolean,
+) {
+    val zone = ZoneId.systemDefault()
+    val t = Instant.ofEpochMilli(finishedAt).atZone(zone).toLocalTime().format(timeFmt)
+    val mins = Insights.minutesToDesk(data.settings, data.logs[now.toLocalDate().toString()], zone)
+    // The sun is in the sky behind. Leave room for it.
+    Spacer(Modifier.height(150.dp))
     Big(if (onTime && !lockOff) Encouragement.doneHeadline(streak) else "You're at your desk.")
     Small(
         when {
             lockOff -> "Done at $t. The lock was off for part of this morning, so it does not count for your streak."
-            onTime -> "Done at $t. Your phone is all yours."
+            onTime -> "At your desk at $t" + (mins?.let { " · $it min after waking" } ?: "")
             else -> "Done at $t, after the lock ended. You still did it."
         }
     )
     if (streak > 0) {
-        Spacer(Modifier.height(24.dp))
-        if (animate) CountUp(streak) else Text("$streak", fontSize = 56.sp, fontWeight = FontWeight.Light)
+        Spacer(Modifier.height(20.dp))
+        if (animate) CountUp(streak) else Text("$streak", fontSize = 56.sp, fontFamily = Palette.Serif)
         Small(if (streak == 1) "good morning in a row" else "good mornings in a row")
         val line = Encouragement.streakLine(streak, best)
         if (line.isNotEmpty()) {
@@ -292,24 +316,73 @@ private fun DoneView(finishedAt: Long, onTime: Boolean, lockOff: Boolean, streak
             )
         }
     }
+    Spacer(Modifier.height(18.dp))
+    MiniWeek(data, now, animateToday = animate)
+    Spacer(Modifier.height(16.dp))
+    Text("Your phone is all yours ☀", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onBackground)
 }
 
+/** The last 7 days as squares. On the done screen, today's square pops in. */
 @Composable
-private fun StepDots(data: AppData, date: java.time.LocalDate) {
-    val done = data.logs[date.toString()]?.done?.map { it.stepId }?.toSet() ?: emptySet()
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun MiniWeek(data: AppData, now: LocalDateTime, animateToday: Boolean, letters: Boolean = false) {
+    val zone = ZoneId.systemDefault()
+    val pop = remember { Animatable(if (animateToday) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        delay(900)
+        pop.animateTo(1f, spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow))
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        (6 downTo 0).forEach { back ->
+            val date = now.toLocalDate().minusDays(back.toLong())
+            val c = Insights.cell(data, date, now, zone)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val m = if (back == 0) Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value } else Modifier
+                Box(
+                    m.size(22.dp).cellSquare(c, 6.dp, selected = back == 0 && Insights.isGood(c))
+                        .semantics { contentDescription = date.dayOfWeek.toString() + ": " + cellLabel(c) },
+                )
+                if (letters) {
+                    Text(
+                        date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, java.util.Locale.getDefault()),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Your steps as chips: done ones show the time, the current one has a sun outline. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StepTrail(data: AppData, date: java.time.LocalDate) {
+    val done = data.logs[date.toString()]?.done?.associate { it.stepId to it.atMillis } ?: emptyMap()
+    val current = data.steps.firstOrNull { it.id !in done }?.id
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         data.steps.forEach { step ->
-            val isDone = step.id in done
-            // A finished dot fills in and pops.
-            val color by animateColorAsState(
-                if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                tween(400), label = "dot-color",
+            val at = done[step.id]
+            val shape = RoundedCornerShape(14.dp)
+            val bg by animateColorAsState(
+                if (at != null) Palette.Sun.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.08f), tween(400), label = "chip",
             )
-            val scale by animateFloatAsState(
-                if (isDone) 1f else 0.8f,
-                spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow), label = "dot-scale",
+            val label = if (at != null) {
+                "✓ ${step.title} " + Instant.ofEpochMilli(at).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
+            } else step.title
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                color = when {
+                    at != null -> Color(0xFFFFD9A6)
+                    step.id == current -> MaterialTheme.colorScheme.onBackground
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier
+                    .background(bg, shape)
+                    .then(if (step.id == current) Modifier.border(1.5.dp, Palette.Sun, shape) else Modifier)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
             )
-            Box(Modifier.size(12.dp).graphicsLayer { scaleX = scale; scaleY = scale }.background(color, CircleShape))
         }
     }
 }
@@ -365,9 +438,9 @@ private fun RestView(data: AppData, now: LocalDateTime, streak: Int, onTestNow: 
         Small(if (streak == 1) "good morning in a row" else "good mornings in a row")
     }
     Spacer(Modifier.height(20.dp))
-    WeekStrip(data, now)
+    MiniWeek(data, now, animateToday = false, letters = true)
     Text(
-        "✓ done   ✈ away   – skipped   ! lock off   ✗ missed",
+        "Bright: early · Blue: away · Red: lock off · Outline: missed",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 6.dp),
@@ -377,35 +450,6 @@ private fun RestView(data: AppData, now: LocalDateTime, streak: Int, onTestNow: 
         Spacer(Modifier.height(12.dp))
         TextButton(onClick = onTestNow) {
             Text(if (untested == 1) "1 step not tested · Test now" else "$untested steps not tested · Test now")
-        }
-    }
-}
-
-/** The last 7 days: ✓ done, ◐ done late, – skipped, ✈ away, ! lock was off, · day off, ✗ missed. */
-@Composable
-private fun WeekStrip(data: AppData, now: LocalDateTime) {
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        (6 downTo 0).forEach { back ->
-            val date = now.toLocalDate().minusDays(back.toLong())
-            val status = Routine.dayStatus(data, date, now)
-            val (mark, color) = when (status) {
-                Routine.DayStatus.OnTime -> "✓" to MaterialTheme.colorScheme.primary
-                Routine.DayStatus.Late -> "◐" to MaterialTheme.colorScheme.primary
-                Routine.DayStatus.Skipped -> "–" to MaterialTheme.colorScheme.onSurfaceVariant
-                Routine.DayStatus.Away -> "✈" to MaterialTheme.colorScheme.secondary
-                Routine.DayStatus.LockOff -> "!" to MaterialTheme.colorScheme.error
-                Routine.DayStatus.DayOff -> "·" to MaterialTheme.colorScheme.onSurfaceVariant
-                Routine.DayStatus.Pending -> "○" to MaterialTheme.colorScheme.onSurfaceVariant
-                Routine.DayStatus.Missed -> "✗" to MaterialTheme.colorScheme.onSurfaceVariant
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(mark, color = color, fontSize = 18.sp)
-                Text(
-                    date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, java.util.Locale.getDefault()),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 }
@@ -459,6 +503,7 @@ fun Notice(text: String, modifier: Modifier = Modifier, onDismiss: () -> Unit) {
 private fun Big(text: String) = Text(
     text,
     style = MaterialTheme.typography.headlineLarge,
+    fontFamily = Palette.Serif,
     textAlign = TextAlign.Center,
     color = MaterialTheme.colorScheme.onBackground,
 )
