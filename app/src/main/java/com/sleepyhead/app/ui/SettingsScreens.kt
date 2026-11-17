@@ -264,7 +264,7 @@ fun TravelSection(store: Store, data: AppData, enabled: Boolean) {
     }
 
     SwitchRow(
-        "Travel mode",
+        "Turn off the lock when I'm away",
         "At lock start, Sleepyhead checks your location. If you are not at home, the lock stays off that day.",
         s.autoTravel, enabled && s.home != null && fgOk,
     ) { v -> setTravel(v) }

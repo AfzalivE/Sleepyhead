@@ -130,8 +130,7 @@ fun App(store: Store, blockedFrom: String?, onBlockedSeen: () -> Unit) {
 }
 
 fun proofMessage(r: Routine.ProofResult): String = when (r) {
-    is Routine.ProofResult.Completed ->
-        if (r.routineDone) "All done. Good morning!" else "Nice. \"${r.step.title}\" is done."
+    is Routine.ProofResult.Completed -> Encouragement.step(r.step.title, r.remaining, r.step.id.hashCode() + r.remaining)
     is Routine.ProofResult.WrongOrder ->
         "That is the ${r.scanned.place} step. First: ${r.expected.title} (${r.expected.place})."
     is Routine.ProofResult.AlreadyDone -> "\"${r.step.title}\" is already done today."

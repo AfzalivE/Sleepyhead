@@ -1,6 +1,20 @@
 package com.sleepyhead.app.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -89,6 +103,23 @@ fun HomeScreen(
     val next = Routine.nextStep(data, today)
     val streak = Routine.streak(data, today)
     var message by remember { mutableStateOf<String?>(null) }
+    val view = LocalView.current
+    val doneCount = log?.done?.size ?: 0
+    val finished = log?.completedAtMillis != null
+    // Celebrate when progress grows while this screen is open (QR or NFC).
+    var lastDone by remember { mutableIntStateOf(doneCount) }
+    var lastFinished by remember { mutableStateOf(finished) }
+    var confettiKey by remember { mutableIntStateOf(0) }
+    var justFinished by remember { mutableStateOf(false) }
+    LaunchedEffect(doneCount, finished) {
+        if (doneCount > lastDone) celebrateHaptic(view)
+        if (finished && !lastFinished) {
+            confettiKey++
+            justFinished = true
+        }
+        lastDone = doneCount
+        lastFinished = finished
+    }
 
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         val text = result.contents ?: return@rememberLauncherForActivityResult
@@ -103,7 +134,8 @@ fun HomeScreen(
         scanner.launch(opts)
     }
 
-    Column(modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(modifier) {
+    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         // Top bar. Small and quiet on purpose.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -128,7 +160,7 @@ fun HomeScreen(
         val travel = Routine.isTravelDay(data, today)
         val finishedAt = log?.completedAtMillis
         when {
-            finishedAt != null -> DoneView(finishedAt, log.onTime, streak)
+            finishedAt != null -> DoneView(finishedAt, log.onTime, streak, Routine.bestStreak(data), justFinished)
             travel -> {
                 Text("✈", fontSize = 56.sp, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(12.dp))
@@ -158,6 +190,8 @@ fun HomeScreen(
             Small("The morning lock is off. Turn it on in Settings.")
         }
     }
+    if (confettiKey > 0) Confetti(confettiKey)
+    }
 }
 
 @Composable
@@ -175,8 +209,20 @@ private fun NextStepView(
     val inWindow = Routine.inMorningWindow(s, now)
     Text("NEXT", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary, letterSpacing = 3.sp)
     Spacer(Modifier.height(8.dp))
-    Big(title)
-    Small(place)
+    // The new step slides up into place when the last one is done.
+    AnimatedContent(
+        targetState = title to place,
+        transitionSpec = {
+            (slideInVertically(tween(450)) { it / 2 } + fadeIn(tween(450))) togetherWith
+                (slideOutVertically(tween(300)) { -it / 2 } + fadeOut(tween(300)))
+        },
+        label = "next-step",
+    ) { (t, p) ->
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Big(t)
+            Small(p)
+        }
+    }
     Spacer(Modifier.height(32.dp))
     if (inWindow) {
         val secondsSinceWake = (nowMin - s.wakeMinutes) * 60 + now.second
@@ -210,30 +256,44 @@ private fun NextStepView(
 }
 
 @Composable
-private fun DoneView(finishedAt: Long, onTime: Boolean, streak: Int) {
+private fun DoneView(finishedAt: Long, onTime: Boolean, streak: Int, best: Int, animate: Boolean) {
     val t = Instant.ofEpochMilli(finishedAt).atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
-    Text("☀", fontSize = 64.sp, color = MaterialTheme.colorScheme.primary)
-    Spacer(Modifier.height(16.dp))
-    Big("You're at your desk.")
-    Small(if (onTime) "Done at $t." else "Done at $t, after the lock ended. You still did it.")
+    RisingSun(animate = animate)
+    Spacer(Modifier.height(8.dp))
+    Big(if (onTime) Encouragement.doneHeadline(streak) else "You're at your desk.")
+    Small(if (onTime) "Done at $t. Your phone is all yours." else "Done at $t, after the lock ended. You still did it.")
     if (streak > 0) {
         Spacer(Modifier.height(24.dp))
-        Text("$streak", fontSize = 56.sp, fontWeight = FontWeight.Light)
-        Small(if (streak == 1) "on-time morning" else "on-time mornings in a row")
+        if (animate) CountUp(streak) else Text("$streak", fontSize = 56.sp, fontWeight = FontWeight.Light)
+        Small(if (streak == 1) "good morning in a row" else "good mornings in a row")
+        val line = Encouragement.streakLine(streak, best)
+        if (line.isNotEmpty()) {
+            Text(
+                line,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
     }
 }
 
 @Composable
 private fun StepDots(data: AppData, date: java.time.LocalDate) {
     val done = data.logs[date.toString()]?.done?.map { it.stepId }?.toSet() ?: emptySet()
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
         data.steps.forEach { step ->
-            Box(
-                Modifier.size(10.dp).background(
-                    if (step.id in done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    CircleShape,
-                )
+            val isDone = step.id in done
+            // A finished dot fills in and pops.
+            val color by animateColorAsState(
+                if (isDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                tween(400), label = "dot-color",
             )
+            val scale by animateFloatAsState(
+                if (isDone) 1f else 0.8f,
+                spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessLow), label = "dot-scale",
+            )
+            Box(Modifier.size(12.dp).graphicsLayer { scaleX = scale; scaleY = scale }.background(color, CircleShape))
         }
     }
 }

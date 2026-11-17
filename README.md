@@ -54,7 +54,7 @@ Requirements: JDK 17 or newer and the Android SDK (platform 35). Android Studio 
    that are installed (for example X, Instagram, Reddit, Slack, Teams, Gmail, YouTube).
 6. Set your lock start, lock end and days.
 7. Optional: in Settings → Travel, allow location ("Allow all the time"), tap *Set to here* while you are at home,
-   and check that *Travel mode* is on (saving home the first time turns it on). Anywhere within 2 km of home counts as home.
+   and check that *Turn off the lock when I'm away* is on (saving home the first time turns it on). Anywhere within 2 km of home counts as home.
 
 The first launch shows these steps as onboarding. Settings → *Show the welcome steps again* shows them again.
 

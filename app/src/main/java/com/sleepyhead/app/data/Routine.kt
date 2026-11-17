@@ -71,7 +71,7 @@ object Routine {
     }
 
     sealed interface ProofResult {
-        data class Completed(val step: Step, val routineDone: Boolean) : ProofResult
+        data class Completed(val step: Step, val routineDone: Boolean, val remaining: Int = 0) : ProofResult
         data class WrongOrder(val scanned: Step, val expected: Step) : ProofResult
         data class AlreadyDone(val step: Step) : ProofResult
         data object Unknown : ProofResult
@@ -111,7 +111,8 @@ object Routine {
         } else {
             log.copy(done = done)
         }
-        return data.copy(logs = data.logs + (key to newLog)) to ProofResult.Completed(step, allDone)
+        val remaining = data.steps.count { s -> done.none { it.stepId == s.id } }
+        return data.copy(logs = data.logs + (key to newLog)) to ProofResult.Completed(step, allDone, remaining)
     }
 
     fun applyScan(data: AppData, scanned: String, now: LocalDateTime, zone: ZoneId = ZoneId.systemDefault()) =
