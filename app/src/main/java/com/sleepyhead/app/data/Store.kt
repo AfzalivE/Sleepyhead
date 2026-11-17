@@ -25,7 +25,11 @@ class Store(context: Context) {
     private fun load(): AppData {
         val raw = prefs.getString(KEY, null)
         val loaded = raw?.let { runCatching { json.decodeFromString<AppData>(it) }.getOrNull() }
-        return loaded ?: AppData(steps = defaultSteps()).also { save(it) }
+        val data = loaded ?: AppData(steps = defaultSteps())
+        if (data.settings.startedOn != null) return data
+        // First run, or data from before this field: start at the earliest log, else today.
+        val start = data.logs.keys.minOrNull() ?: LocalDate.now().toString()
+        return data.copy(settings = data.settings.copy(startedOn = start)).also { save(it) }
     }
 
     private fun save(d: AppData) {
@@ -45,11 +49,35 @@ class Store(context: Context) {
         Routine.isLockActive(_data.value, now)
 
     @Synchronized
-    fun scan(text: String, now: LocalDateTime = LocalDateTime.now()): Routine.ScanResult {
+    fun scan(text: String, now: LocalDateTime = LocalDateTime.now()): Routine.ProofResult {
         val (next, result) = Routine.applyScan(_data.value, text, now, ZoneId.systemDefault())
         update { next }
         return result
     }
+
+    @Synchronized
+    fun tapTag(tagId: String?, tagCode: String?, now: LocalDateTime = LocalDateTime.now()): Routine.ProofResult {
+        val (next, result) = Routine.applyTag(_data.value, tagId, tagCode, now, ZoneId.systemDefault())
+        update { next }
+        return result
+    }
+
+    /** Pairs an NFC tag with a step. A tag can belong to one step only. */
+    fun pairTag(stepId: String, tagId: String) = update { d ->
+        d.copy(steps = d.steps.map {
+            when {
+                it.id == stepId -> it.copy(nfcTagId = tagId, testedAtMillis = System.currentTimeMillis())
+                it.nfcTagId.equals(tagId, ignoreCase = true) -> it.copy(nfcTagId = null)
+                else -> it
+            }
+        })
+    }
+
+    fun unpairTag(stepId: String) = update { d ->
+        d.copy(steps = d.steps.map { if (it.id == stepId) it.copy(nfcTagId = null) else it })
+    }
+
+    fun setAwayToday(away: Boolean, now: LocalDateTime = LocalDateTime.now()) = updateToday(now) { it.copy(away = away) }
 
     fun skipToday(now: LocalDateTime = LocalDateTime.now()) = updateToday(now) { it.copy(skipped = true) }
 
@@ -75,7 +103,11 @@ class Store(context: Context) {
     fun newStep(title: String, place: String): Step = Step(id = randomToken(6), title = title, place = place, code = newCode())
 
     /** Makes new codes for every step. Old printed codes stop working. */
-    fun regenerateCodes() = update { d -> d.copy(steps = d.steps.map { it.copy(code = newCode()) }) }
+    fun regenerateCodes() = update { d -> d.copy(steps = d.steps.map { it.copy(code = newCode(), testedAtMillis = null) }) }
+
+    fun markTested(stepId: String) = update { d ->
+        d.copy(steps = d.steps.map { if (it.id == stepId) it.copy(testedAtMillis = System.currentTimeMillis()) else it })
+    }
 
     fun today(): LocalDate = LocalDate.now()
 
