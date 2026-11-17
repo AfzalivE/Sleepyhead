@@ -238,17 +238,42 @@ fun TravelSection(store: Store, data: AppData, enabled: Boolean) {
     }
     val backgroundGranted = bgOk || bgNow
 
+    // Turning a travel switch off on a no-lock day starts the lock right away, and the
+    // switches are disabled while the lock is on. So ask first.
+    var confirmOff by remember { mutableStateOf<String?>(null) }
+    val now = LocalDateTime.now()
+    val noLockToday = Routine.travelState(data, now.toLocalDate()) != null &&
+        Routine.inMorningWindow(s, now) && !Routine.isFinished(data.logs[now.toLocalDate().toString()])
+    fun setTravel(which: String, v: Boolean) {
+        if (!v && noLockToday) { confirmOff = which; return }
+        store.updateSettings { if (which == "manual") it.copy(travelMode = v) else it.copy(autoTravel = v) }
+    }
+    confirmOff?.let { which ->
+        AlertDialog(
+            onDismissRequest = { confirmOff = null },
+            title = { Text("Start the lock now?") },
+            text = { Text("The morning lock starts right away. You cannot change travel settings again until the lock ends at ${minutesToText(s.lockEndMinutes)}.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    store.updateSettings { if (which == "manual") it.copy(travelMode = false) else it.copy(autoTravel = false) }
+                    confirmOff = null
+                }) { Text("Start the lock") }
+            },
+            dismissButton = { TextButton(onClick = { confirmOff = null }) { Text("Cancel") } },
+        )
+    }
+
     SwitchRow(
         "Travel mode",
         "The lock stays off until you turn this off.",
         s.travelMode, enabled,
-    ) { v -> store.updateSettings { it.copy(travelMode = v) } }
+    ) { v -> setTravel("manual", v) }
 
     SwitchRow(
         "Turn off the lock when I'm away",
         "At lock start, Sleepyhead checks your location. If you are not at home, the lock stays off that day.",
         s.autoTravel, enabled && s.home != null && fgOk,
-    ) { v -> store.updateSettings { it.copy(autoTravel = v) } }
+    ) { v -> setTravel("auto", v) }
 
     if (!fgOk) {
         SetupRow("Location", "Needed to know if you are at home. Approximate location is enough.", false, "Allow") {
