@@ -15,21 +15,22 @@ object Insights {
     fun deskTime(log: DayLog?, zone: ZoneId): LocalTime? =
         log?.completedAtMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
 
-    /** Minutes from lock start (your wake-up time) to the end of the routine. */
-    fun minutesToDesk(settings: Settings, log: DayLog?, zone: ZoneId): Int? {
-        val t = deskTime(log, zone) ?: return null
-        return (t.hour * 60 + t.minute - settings.wakeMinutes).takeIf { it >= 0 }
-    }
+    /** The time of day you finished, as minutes after midnight. */
+    fun deskMinutes(log: DayLog?, zone: ZoneId): Int? = deskTime(log, zone)?.let { it.hour * 60 + it.minute }
+
+    /** Square brightness by time of day: before 8:00 is early, 8:00 to 10:00 is mid, later is late. */
+    const val EARLY_BEFORE = 8 * 60
+    const val MID_BEFORE = 10 * 60
+
+    fun minutesToTime(m: Int): LocalTime = LocalTime.of((m / 60).coerceIn(0, 23), m % 60)
 
     fun cell(data: AppData, date: LocalDate, now: LocalDateTime, zone: ZoneId): Cell =
         when (Routine.dayStatus(data, date, now)) {
             Routine.DayStatus.OnTime -> {
-                val s = data.settings
-                val m = minutesToDesk(s, data.logs[date.toString()], zone) ?: 0
-                val f = m.toFloat() / (s.lockEndMinutes - s.wakeMinutes).coerceAtLeast(1)
+                val m = deskMinutes(data.logs[date.toString()], zone) ?: 0
                 when {
-                    f < 1f / 3 -> Cell.Early
-                    f < 2f / 3 -> Cell.Mid
+                    m < EARLY_BEFORE -> Cell.Early
+                    m < MID_BEFORE -> Cell.Mid
                     else -> Cell.Late
                 }
             }
@@ -59,19 +60,21 @@ object Insights {
 
     /** Median time of day you finished, over the last [n] days. */
     fun usualDeskTime(data: AppData, today: LocalDate, zone: ZoneId, n: Int = 30): LocalTime? {
-        val mins = (0 until n).mapNotNull { deskTime(data.logs[today.minusDays(it.toLong()).toString()], zone) }
-            .map { it.hour * 60 + it.minute }.sorted()
+        val mins = deskTimeSeries(data, today, zone, n).map { it.second }.sorted()
         if (mins.isEmpty()) return null
-        val mid = mins[mins.size / 2]
-        return LocalTime.of(mid / 60, mid % 60)
+        return minutesToTime(mins[mins.size / 2])
     }
 
-    /** Minutes to desk for each finished day in the last [n] days, oldest first. */
-    fun timeToDeskSeries(data: AppData, today: LocalDate, zone: ZoneId, n: Int = 30): List<Pair<LocalDate, Int>> =
+    /** Time of day you finished (minutes after midnight) for each finished day in the last [n] days, oldest first. */
+    fun deskTimeSeries(data: AppData, today: LocalDate, zone: ZoneId, n: Int = 30): List<Pair<LocalDate, Int>> =
         (n - 1 downTo 0).mapNotNull { back ->
             val d = today.minusDays(back.toLong())
-            minutesToDesk(data.settings, data.logs[d.toString()], zone)?.let { d to it }
+            deskMinutes(data.logs[d.toString()], zone)?.let { d to it }
         }
+
+    /** Earliest time of day you finished in the last [n] days. */
+    fun earliestDeskTime(data: AppData, today: LocalDate, zone: ZoneId, n: Int = 30): LocalTime? =
+        deskTimeSeries(data, today, zone, n).minOfOrNull { it.second }?.let { minutesToTime(it) }
 
     fun average(values: List<Int>): Int? = if (values.isEmpty()) null else Math.round(values.average()).toInt()
 

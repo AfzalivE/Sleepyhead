@@ -25,11 +25,12 @@ class InsightsTest {
         d.toString(), completedAtMillis = LocalDateTime.of(d, LocalTime.of(h, m)).toInstant(zone).toEpochMilli(), onTime = onTime,
     )
 
-    @Test fun cellBrightnessFollowsFinishTime() {
+    @Test fun cellBrightnessFollowsTimeOfDay() {
+        val wide = base.copy(settings = settings.copy(wakeMinutes = 2 * 60, lockEndMinutes = 23 * 60 + 59))
         val fri = monday.minusDays(3)
         val thu = monday.minusDays(4)
         val wed = monday.minusDays(5)
-        val d = base.copy(logs = mapOf(done(monday, 6, 40), done(fri, 7, 30), done(thu, 8, 30), done(wed, 9, 30, onTime = false)))
+        val d = wide.copy(logs = mapOf(done(monday, 7, 40), done(fri, 9, 30), done(thu, 10, 30), done(wed, 9, 0, onTime = false)))
         assertEquals(Insights.Cell.Early, Insights.cell(d, monday, now, zone))
         assertEquals(Insights.Cell.Mid, Insights.cell(d, fri, now, zone))
         assertEquals(Insights.Cell.Late, Insights.cell(d, thu, now, zone))
@@ -38,13 +39,13 @@ class InsightsTest {
         assertEquals(Insights.Cell.Missed, Insights.cell(d, monday.minusDays(6), now, zone)) // Tuesday, nothing
     }
 
-    @Test fun statsAndTrend() {
+    @Test fun deskTimeStatsAndTrend() {
         val d = base.copy(logs = mapOf(done(monday, 7, 0), done(monday.minusDays(3), 7, 30), done(monday.minusDays(4), 8, 0)))
         assertEquals(LocalTime.of(7, 30), Insights.usualDeskTime(d, monday, zone))
-        assertEquals(listOf(120, 90, 60), Insights.timeToDeskSeries(d, monday, zone).map { it.second })
-        assertEquals(90, Insights.average(listOf(120, 90, 60)))
-        assertNull(Insights.trend(listOf(120, 90, 60)))
-        assertEquals(100 to 60, Insights.trend(listOf(110, 90, 70, 50)))
+        assertEquals(LocalTime.of(7, 0), Insights.earliestDeskTime(d, monday, zone))
+        assertEquals(listOf(480, 450, 420), Insights.deskTimeSeries(d, monday, zone).map { it.second })
+        assertNull(Insights.trend(listOf(480, 450, 420)))
+        assertEquals(470 to 430, Insights.trend(listOf(480, 460, 440, 420)))
     }
 
     @Test fun milestones() {

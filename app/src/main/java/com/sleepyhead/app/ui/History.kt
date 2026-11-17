@@ -84,8 +84,8 @@ fun HistoryScreen(data: AppData, onBack: () -> Unit, modifier: Modifier) {
                 WeekGrid(data, now, zone, selected) { selected = if (selected == it) null else it }
                 Legend()
                 selected?.let { DayDetail(data, it, now, zone) }
-                SectionTitle("TIME TO DESK", "last 30 days", null)
-                TimeToDesk(data, today, zone)
+                SectionTitle("DESK TIME", "last 30 days", null)
+                DeskTimeChart(data, today, zone)
             }
             HistoryTab.Year -> {
                 Stepper("$year", canNext = year < today.year, onPrev = { year--; selected = null }, onNext = { year++; selected = null })
@@ -201,11 +201,11 @@ private fun StatsRow(data: AppData, now: LocalDateTime, zone: ZoneId) {
     val today = now.toLocalDate()
     val pct = Insights.onTimePercent(data, now, zone)
     val usual = Insights.usualDeskTime(data, today, zone)
-    val avg = Insights.average(Insights.timeToDeskSeries(data, today, zone).map { it.second })
+    val earliest = Insights.earliestDeskTime(data, today, zone)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         StatCard(pct?.let { "$it%" } ?: "–", "on time, 30 days", Modifier.weight(1f))
         StatCard(usual?.format(shortTime) ?: "–", "usual desk time", Modifier.weight(1f))
-        StatCard(avg?.let { "$it min" } ?: "–", "avg wake → desk", Modifier.weight(1f))
+        StatCard(earliest?.format(shortTime) ?: "–", "earliest, 30 days", Modifier.weight(1f))
     }
 }
 
@@ -407,7 +407,6 @@ private fun DayDetail(data: AppData, d: LocalDate, now: LocalDateTime, zone: Zon
     val log = data.logs[d.toString()]
     val c = Insights.cell(data, d, now, zone)
     val t = Insights.deskTime(log, zone)
-    val mins = Insights.minutesToDesk(data.settings, log, zone)
     Column(
         Modifier.fillMaxWidth().padding(vertical = 10.dp)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp))
@@ -415,7 +414,7 @@ private fun DayDetail(data: AppData, d: LocalDate, now: LocalDateTime, zone: Zon
     ) {
         Text(d.format(dayFmt), color = Palette.Sun, fontWeight = FontWeight.SemiBold)
         Text(
-            if (t != null) "Desk at ${t.format(shortTime)}" + (mins?.let { " · $it min" } ?: "") +
+            if (t != null) "Desk at ${t.format(shortTime)}" +
                 (if (c == Insights.Cell.AfterEnd || c == Insights.Cell.LockOff) " · ${cellLabel(c)}" else "")
             else cellLabel(c),
             style = MaterialTheme.typography.bodyMedium,
@@ -426,8 +425,8 @@ private fun DayDetail(data: AppData, d: LocalDate, now: LocalDateTime, zone: Zon
 }
 
 @Composable
-private fun TimeToDesk(data: AppData, today: LocalDate, zone: ZoneId) {
-    val series = Insights.timeToDeskSeries(data, today, zone)
+private fun DeskTimeChart(data: AppData, today: LocalDate, zone: ZoneId) {
+    val series = Insights.deskTimeSeries(data, today, zone)
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(16.dp)).padding(14.dp)) {
         if (series.size < 2) {
             Text("Finish a few mornings to see your trend here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -441,18 +440,20 @@ private fun TimeToDesk(data: AppData, today: LocalDate, zone: ZoneId) {
             val path = Path()
             series.forEachIndexed { i, (d, v) ->
                 val x = size.width * (java.time.temporal.ChronoUnit.DAYS.between(start, d) / 29f)
-                val y = size.height * (1f - (v - lo) / (hi - lo)) * 0.9f + size.height * 0.05f
+                // Earlier in the day is higher.
+                val y = size.height * ((v - lo) / (hi - lo)) * 0.9f + size.height * 0.05f
                 if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
             drawPath(path, Palette.Sun, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
         val tr = Insights.trend(values)
+        fun t(m: Int) = Insights.minutesToTime(m).format(shortTime)
         Text(
             when {
-                tr == null -> "Average ${Insights.average(values)} min from lock start to desk."
-                tr.second < tr.first -> "Getting faster: ${tr.first} → ${tr.second} min"
-                tr.second > tr.first -> "A bit slower: ${tr.first} → ${tr.second} min"
-                else -> "Steady: about ${tr.second} min"
+                tr == null -> "Average desk time: ${t(Insights.average(values)!!)}"
+                tr.second < tr.first -> "Getting earlier: ${t(tr.first)} → ${t(tr.second)}"
+                tr.second > tr.first -> "A bit later: ${t(tr.first)} → ${t(tr.second)}"
+                else -> "Steady: about ${t(tr.second)}"
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -255,15 +255,14 @@ private fun NextStepView(
     }
     Spacer(Modifier.height(32.dp))
     if (inWindow) {
-        val secondsSinceWake = (nowMin - s.wakeMinutes) * 60 + now.second
+        // The clock, not a timer: what counts is how early in the day you finish.
         Text(
-            formatDuration(secondsSinceWake),
+            now.toLocalTime().format(timeFmt),
             fontSize = 56.sp,
             fontWeight = FontWeight.ExtraLight,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        val left = s.lockEndMinutes - nowMin
-        Small("since ${minutesToText(s.wakeMinutes)} · lock ends ${minutesToText(s.lockEndMinutes)} ($left min)")
+        Small("Lock ends at ${minutesToText(s.lockEndMinutes)}")
     } else if (Routine.isRoutineDay(s, now.toLocalDate()) && nowMin < s.wakeMinutes) {
         Small("Your morning starts at ${minutesToText(s.wakeMinutes)}. Sleep well.")
     } else {
@@ -298,14 +297,13 @@ private fun DoneView(
 ) {
     val zone = ZoneId.systemDefault()
     val t = Instant.ofEpochMilli(finishedAt).atZone(zone).toLocalTime().format(timeFmt)
-    val mins = Insights.minutesToDesk(data.settings, data.logs[now.toLocalDate().toString()], zone)
     // The sun is in the sky behind. Leave room for it.
     Spacer(Modifier.height(150.dp))
     Big(if (onTime && !lockOff) Encouragement.doneHeadline(streak) else "You're at your desk.")
     Small(
         when {
             lockOff -> "Done at $t. The lock was off for part of this morning, so it does not count for your streak."
-            onTime -> "At your desk at $t" + (mins?.let { " · $it min after waking" } ?: "")
+            onTime -> "At your desk at $t"
             else -> "Done at $t, after the lock ended. You still did it."
         }
     )
@@ -529,14 +527,6 @@ private fun Small(text: String) = Text(
     color = MaterialTheme.colorScheme.onSurfaceVariant,
     modifier = Modifier.padding(top = 6.dp),
 )
-
-private fun formatDuration(totalSeconds: Int): String {
-    val s = totalSeconds.coerceAtLeast(0)
-    val h = s / 3600
-    val m = (s % 3600) / 60
-    val sec = s % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
-}
 
 private fun inWindowNow(data: AppData, now: LocalDateTime) = data.steps.isNotEmpty() && Routine.inMorningWindow(data.settings, now)
 
