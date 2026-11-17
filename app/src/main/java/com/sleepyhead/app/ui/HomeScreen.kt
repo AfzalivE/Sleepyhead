@@ -194,7 +194,7 @@ fun HomeScreen(
             StepDots(data, today)
             Spacer(Modifier.height(16.dp))
         }
-        if (lockActive) {
+        if (lockActive && serviceOn) {
             HoldToSkip { store.skipToday() }
         } else if (!serviceOn && !inWindow) {
             Small("The morning lock is off. Turn it on in Settings.")
