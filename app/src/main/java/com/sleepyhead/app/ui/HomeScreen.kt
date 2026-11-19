@@ -69,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -237,6 +238,11 @@ private fun NextStepView(
     val nowMin = Routine.minutesOfDay(now)
     val inWindow = Routine.inMorningWindow(s, now)
     val doneCount = data.logs[now.toLocalDate().toString()]?.done?.size ?: 0
+    // On short phones the streak card would push the skip control off the screen, so everything is tighter.
+    val height = LocalConfiguration.current.screenHeightDp
+    val compact = height < 760
+    val tiny = height < 620
+    val gap = if (tiny) 8.dp else if (compact) 12.dp else 32.dp
     Text(
         "STEP ${(doneCount + 1).coerceAtMost(data.steps.size)} OF ${data.steps.size}",
         style = MaterialTheme.typography.labelLarge,
@@ -258,26 +264,27 @@ private fun NextStepView(
             Small(p)
         }
     }
-    Spacer(Modifier.height(32.dp))
+    Spacer(Modifier.height(gap))
     if (inWindow) {
         // The clock, not a timer: what counts is how early in the day you finish.
         Text(
             now.toLocalTime().format(timeFmt),
-            fontSize = 56.sp,
+            fontSize = if (tiny) 40.sp else if (compact) 44.sp else 56.sp,
             fontWeight = FontWeight.ExtraLight,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Small("Lock ends at ${minutesToText(s.lockEndMinutes)}")
+        // On short phones the streak card already says when the lock ends.
+        if (!(compact && lockActive)) Small("Lock ends at ${minutesToText(s.lockEndMinutes)}")
         if (lockActive) {
-            Spacer(Modifier.height(20.dp))
-            StreakGoal(data, now, streak)
+            Spacer(Modifier.height(if (compact) 12.dp else 20.dp))
+            StreakGoal(data, now, streak, compact, showDays = !tiny)
         }
     } else if (Routine.isRoutineDay(s, now.toLocalDate()) && nowMin < s.wakeMinutes) {
         Small("Your morning starts at ${minutesToText(s.wakeMinutes)}. Sleep well.")
     } else {
         Small("No morning lock right now. You can still practice the routine.")
     }
-    Spacer(Modifier.height(32.dp))
+    Spacer(Modifier.height(gap))
     Button(
         onClick = onScan,
         modifier = Modifier.fillMaxWidth().height(64.dp),
@@ -341,7 +348,7 @@ private fun DoneView(
  * The last six days are filled in, and today's square is an outline that waits for you.
  */
 @Composable
-private fun StreakGoal(data: AppData, now: LocalDateTime, streak: Int) {
+private fun StreakGoal(data: AppData, now: LocalDateTime, streak: Int, compact: Boolean, showDays: Boolean = true) {
     val best = remember(data.logs) { Routine.bestStreak(data) }
     val zone = ZoneId.systemDefault()
     val shape = RoundedCornerShape(18.dp)
@@ -354,10 +361,11 @@ private fun StreakGoal(data: AppData, now: LocalDateTime, streak: Int) {
             .fillMaxWidth()
             .background(Color.White.copy(alpha = 0.06f), shape)
             .border(1.dp, Palette.Sun.copy(alpha = 0.35f), shape)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (streak > 0) {
+        // Compact: the number sits next to the squares, on one line.
+        if (streak > 0 && !compact) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text("$streak", fontSize = 28.sp, fontWeight = FontWeight.Light, color = Palette.Sun)
                 Spacer(Modifier.size(8.dp))
@@ -370,8 +378,16 @@ private fun StreakGoal(data: AppData, now: LocalDateTime, streak: Int) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            (6 downTo 1).forEach { back ->
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (streak > 0 && compact) {
+                Text(
+                    "$streak in a row",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(end = 6.dp),
+                )
+            }
+            if (showDays) (6 downTo 1).forEach { back ->
                 val date = now.toLocalDate().minusDays(back.toLong())
                 val c = Insights.cell(data, date, now, zone)
                 Box(
@@ -379,13 +395,13 @@ private fun StreakGoal(data: AppData, now: LocalDateTime, streak: Int) {
                         .semantics { contentDescription = date.dayOfWeek.toString() + ": " + cellLabel(c) },
                 )
             }
-            Box(
+            if (showDays) Box(
                 Modifier.size(16.dp)
                     .border(1.5.dp, Palette.Sun.copy(alpha = glow), RoundedCornerShape(4.dp))
                     .semantics { contentDescription = "Today: not done yet" },
             )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(if (compact) 6.dp else 8.dp))
         Text(
             Encouragement.lockGoal(streak, best, minutesToText(data.settings.lockEndMinutes)),
             style = MaterialTheme.typography.titleSmall,
