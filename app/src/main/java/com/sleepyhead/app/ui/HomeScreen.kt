@@ -4,7 +4,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -199,7 +203,7 @@ fun HomeScreen(
                 TextButton(onClick = { store.undoSkipToday() }) { Text("Undo skip") }
             }
             next == null -> Big("Add a step in Settings to start.")
-            else -> NextStepView(data, now, next.title, next.place, next.nfcTagId != null, lockActive) { scan() }
+            else -> NextStepView(data, now, next.title, next.place, next.nfcTagId != null, lockActive, streak) { scan() }
         }
 
         Spacer(Modifier.weight(1f))
@@ -209,7 +213,7 @@ fun HomeScreen(
             Spacer(Modifier.height(16.dp))
         }
         if (lockActive && serviceOn) {
-            HoldToSkip { store.skipToday() }
+            HoldToSkip(streak) { store.skipToday() }
         } else if (!serviceOn && !inWindow) {
             Small("The morning lock is off. Turn it on in Settings.")
         }
@@ -226,6 +230,7 @@ private fun NextStepView(
     place: String,
     hasTag: Boolean,
     lockActive: Boolean,
+    streak: Int,
     onScan: () -> Unit,
 ) {
     val s = data.settings
@@ -263,6 +268,10 @@ private fun NextStepView(
             color = MaterialTheme.colorScheme.onBackground,
         )
         Small("Lock ends at ${minutesToText(s.lockEndMinutes)}")
+        if (lockActive) {
+            Spacer(Modifier.height(20.dp))
+            StreakGoal(data, now, streak)
+        }
     } else if (Routine.isRoutineDay(s, now.toLocalDate()) && nowMin < s.wakeMinutes) {
         Small("Your morning starts at ${minutesToText(s.wakeMinutes)}. Sleep well.")
     } else {
@@ -325,6 +334,65 @@ private fun DoneView(
     MiniWeek(data, now, animateToday = animate, letters = true, onLight = true)
     Spacer(Modifier.height(16.dp))
     Text("Your phone is all yours ☀", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onBackground)
+}
+
+/**
+ * During the lock: your streak and what finishing today does for it.
+ * The last six days are filled in, and today's square is an outline that waits for you.
+ */
+@Composable
+private fun StreakGoal(data: AppData, now: LocalDateTime, streak: Int) {
+    val best = remember(data.logs) { Routine.bestStreak(data) }
+    val zone = ZoneId.systemDefault()
+    val shape = RoundedCornerShape(18.dp)
+    // Today's square breathes, so it asks to be filled.
+    val glow by rememberInfiniteTransition(label = "today").animateFloat(
+        0.35f, 1f, infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "glow",
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.06f), shape)
+            .border(1.dp, Palette.Sun.copy(alpha = 0.35f), shape)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (streak > 0) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("$streak", fontSize = 28.sp, fontWeight = FontWeight.Light, color = Palette.Sun)
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    Encouragement.lockStreakLabel(streak),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 5.dp),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            (6 downTo 1).forEach { back ->
+                val date = now.toLocalDate().minusDays(back.toLong())
+                val c = Insights.cell(data, date, now, zone)
+                Box(
+                    Modifier.size(16.dp).cellSquare(c, 4.dp)
+                        .semantics { contentDescription = date.dayOfWeek.toString() + ": " + cellLabel(c) },
+                )
+            }
+            Box(
+                Modifier.size(16.dp)
+                    .border(1.5.dp, Palette.Sun.copy(alpha = glow), RoundedCornerShape(4.dp))
+                    .semantics { contentDescription = "Today: not done yet" },
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            Encouragement.lockGoal(streak, best, minutesToText(data.settings.lockEndMinutes)),
+            style = MaterialTheme.typography.titleSmall,
+            color = Palette.Sun,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 /** The last 7 days as squares. On the done screen, today's square pops in. */
@@ -468,7 +536,7 @@ private fun RestView(data: AppData, now: LocalDateTime, streak: Int, onTestNow: 
 
 /** Skipping must be slow, so you do it only when you really need your phone. */
 @Composable
-private fun HoldToSkip(onSkip: () -> Unit) {
+private fun HoldToSkip(streak: Int, onSkip: () -> Unit) {
     val progress = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -492,6 +560,15 @@ private fun HoldToSkip(onSkip: () -> Unit) {
                 }
                 .padding(12.dp),
         )
+        val cost = Encouragement.skipCost(streak)
+        if (cost.isNotEmpty()) {
+            Text(
+                cost,
+                style = MaterialTheme.typography.labelSmall,
+                color = Palette.Sun.copy(alpha = 0.8f),
+                textAlign = TextAlign.Center,
+            )
+        }
         if (progress.value > 0f) {
             LinearProgressIndicator(progress = { progress.value }, modifier = Modifier.fillMaxWidth())
         }
