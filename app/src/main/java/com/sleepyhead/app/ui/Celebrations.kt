@@ -72,6 +72,31 @@ object Encouragement {
 
     fun isMilestone(streak: Int) = streak in setOf(3, 5, 7, 10, 14, 21, 30, 50, 100) || (streak > 100 && streak % 50 == 0)
 
+    /**
+     * The goal line on the lock screen: what finishing on time today does for your streak.
+     * [by] is the lock end time as text.
+     */
+    fun lockGoal(streak: Int, best: Int, by: String): String {
+        if (streak <= 0) return "Finish by $by to start a new streak."
+        val next = streak + 1
+        return when {
+            isMilestone(next) -> "Finish by $by to reach ${com.sleepyhead.app.data.Insights.milestoneName(next)}."
+            next > best && best > 1 -> "Finish by $by for a new best streak."
+            else -> "Finish by $by to make it $next."
+        }
+    }
+
+    /** The line on the lock screen over the streak number. */
+    fun lockStreakLabel(streak: Int): String =
+        if (streak == 1) "good morning in a row" else "good mornings in a row"
+
+    /** The skip text: say what a skip costs when there is a streak to lose. */
+    fun skipCost(streak: Int): String = when {
+        streak <= 0 -> ""
+        streak == 1 -> "Skipping ends your 1-morning streak."
+        else -> "Skipping ends your $streak-morning streak."
+    }
+
     fun streakLine(streak: Int, best: Int): String = when {
         streak <= 0 -> ""
         streak > 1 && streak >= best -> "New best streak!"

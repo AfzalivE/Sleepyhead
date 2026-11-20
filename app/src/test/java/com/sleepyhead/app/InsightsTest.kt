@@ -73,4 +73,15 @@ class InsightsTest {
         assertEquals("11 in a row. Good morning!", e.doneHeadline(11))
         assertEquals("You're at your desk.", e.doneHeadline(1))
     }
+
+    @Test fun lockGoalNamesWhatTodayWins() {
+        val e = com.sleepyhead.app.ui.Encouragement
+        assertEquals("Finish by 9:00 to start a new streak.", e.lockGoal(0, 5, "9:00"))
+        assertEquals("Finish by 9:00 to reach a full week.", e.lockGoal(6, 10, "9:00"))
+        assertEquals("Finish by 9:00 for a new best streak.", e.lockGoal(11, 11, "9:00"))
+        assertEquals("Finish by 9:00 to make it 12.", e.lockGoal(11, 20, "9:00"))
+        assertEquals("Finish by 9:00 to reach 3 in a row.", e.lockGoal(2, 2, "9:00"))
+        assertEquals("", e.skipCost(0))
+        assertEquals("Skipping ends your 4-morning streak.", e.skipCost(4))
+    }
 }
