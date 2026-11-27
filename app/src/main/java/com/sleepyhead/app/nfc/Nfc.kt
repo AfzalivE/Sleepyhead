@@ -75,9 +75,19 @@ object NfcHub {
         runCatching { NfcAdapter.getDefaultAdapter(activity)?.disableReaderMode(activity) }
     }
 
-    /** Handles a tag that opened the app from the background (NDEF_DISCOVERED). Returns true if handled. */
-    fun handleIntent(context: Context, store: Store, intent: Intent?): Boolean {
-        if (intent?.action != NfcAdapter.ACTION_NDEF_DISCOVERED) return false
+    /**
+     * True for a tag tap that changes nothing because the step (or the whole routine) is already done today.
+     * Sleepyhead ignores these taps: it shows no message.
+     */
+    fun isIgnored(result: Routine.ProofResult) =
+        result is Routine.ProofResult.AlreadyDone || result == Routine.ProofResult.NothingLeft
+
+    /**
+     * Handles a tag that opened the app from the background (NDEF_DISCOVERED).
+     * Returns the result, or null if [intent] is not a tag.
+     */
+    fun handleIntent(context: Context, store: Store, intent: Intent?): Routine.ProofResult? {
+        if (intent?.action != NfcAdapter.ACTION_NDEF_DISCOVERED) return null
         val tagId = intent.getByteArrayExtra(NfcAdapter.EXTRA_ID)?.toHex()
         val messages = if (Build.VERSION.SDK_INT >= 33) {
             intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES, NdefMessage::class.java)
@@ -86,8 +96,9 @@ object NfcHub {
             intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)?.filterIsInstance<NdefMessage>()?.toTypedArray()
         }
         val code = messages?.firstNotNullOfOrNull { codeFrom(it) }
-        _event.value = (NfcEvent.Proof(store.tapTag(tagId, code)))
-        return true
+        val result = store.tapTag(tagId, code)
+        if (!isIgnored(result)) _event.value = NfcEvent.Proof(result)
+        return result
     }
 
     private fun onTag(context: Context, store: Store, tag: Tag) {
@@ -108,7 +119,8 @@ object NfcHub {
             reportTest(store, testingId, Routine.stepForTag(data, tagId) ?: Routine.stepForCode(data, code))
             return
         }
-        _event.value = (NfcEvent.Proof(store.tapTag(tagId, code)))
+        val result = store.tapTag(tagId, code)
+        if (!isIgnored(result)) _event.value = NfcEvent.Proof(result)
     }
 
     private fun codeFrom(message: NdefMessage): String? =
