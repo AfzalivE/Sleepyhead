@@ -56,7 +56,14 @@ class MainActivity : ComponentActivity() {
         )
         blockedFrom.value = intent?.getStringExtra(EXTRA_BLOCKED_PACKAGE)
         applyDefaultBlockedApps(store)
-        if (savedInstanceState == null) NfcHub.handleIntent(this, store, intent)
+        if (savedInstanceState == null) {
+            val tap = NfcHub.handleIntent(this, store, intent)
+            // A tag for a step that is already done opened the app. Ignore the tap: close again.
+            if (tap != null && NfcHub.isIgnored(tap)) {
+                finish()
+                return
+            }
+        }
         setContent {
             SleepyheadTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -83,7 +90,9 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         intent.getStringExtra(EXTRA_BLOCKED_PACKAGE)?.let { blockedFrom.value = it }
-        NfcHub.handleIntent(this, store, intent)
+        val tap = NfcHub.handleIntent(this, store, intent)
+        // A tag for a step that is already done brought the app to the front. Ignore the tap: go back.
+        if (tap != null && NfcHub.isIgnored(tap)) moveTaskToBack(true)
     }
 
     /** On first launch, pre-select common news, social and work chat apps that are installed. */

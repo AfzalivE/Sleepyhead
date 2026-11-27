@@ -595,7 +595,11 @@ private fun HoldToSkip(streak: Int, onSkip: () -> Unit) {
 fun Notice(text: String, modifier: Modifier = Modifier, onDismiss: () -> Unit) {
     Card(
         modifier = modifier.fillMaxWidth().padding(top = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        // On the sunrise the text is dark ink, so the card must be light. Otherwise the card is dark.
+        colors = CardDefaults.cardColors(
+            containerColor = if (LocalSunrise.current) Palette.Cream else MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
     ) {
         Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(text, Modifier.weight(1f).padding(vertical = 12.dp), style = MaterialTheme.typography.bodyMedium)

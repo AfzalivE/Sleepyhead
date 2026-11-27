@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -37,6 +38,8 @@ object Palette {
     val Skipped = Color(0xFF3A4152)
     val Empty = Color(0xFF1E2430)
     val Ink = Color(0xFF2A1B05)
+    /** Light card background on the sunrise, for dark [Ink] text. */
+    val Cream = Color(0xFFFFF4E2)
 
     private val night = listOf(Color(0xFF10141D), Color(0xFF141A27), Color(0xFF181E2E), Color(0xFF1C2236))
     private val dawn = listOf(Color(0xFF141A2B), Color(0xFF202844), Color(0xFF4B3D58), Color(0xFFA9705A))
@@ -89,6 +92,9 @@ fun SkyBackground(level: Float, modifier: Modifier = Modifier.fillMaxSize()) {
     }
 }
 
+/** True inside [SunriseInk]. Cards use it to pick a light background that suits the dark ink. */
+val LocalSunrise = staticCompositionLocalOf { false }
+
 /** Dark ink on the bright sunrise, so text stays easy to read. */
 @Composable
 fun SunriseInk(on: Boolean, content: @Composable () -> Unit) {
@@ -104,7 +110,7 @@ fun SunriseInk(on: Boolean, content: @Composable () -> Unit) {
         ),
         typography = MaterialTheme.typography,
     ) {
-        CompositionLocalProvider(LocalContentColor provides Palette.Ink, content = content)
+        CompositionLocalProvider(LocalContentColor provides Palette.Ink, LocalSunrise provides true, content = content)
     }
 }
 
